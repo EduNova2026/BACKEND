@@ -8,9 +8,10 @@ from unittest.mock import AsyncMock, patch
 import httpx
 import pytest
 import pytest_asyncio
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.database import get_replica_session, get_session
-from app.dependencies import auth as dependencies_auth
 from app.main import app as fastapi_app
 from app.models import Role, User
 from app.redis_client import get_redis
@@ -22,40 +23,11 @@ from app.services.jwt_service import validate_token
 pytestmark = pytest.mark.asyncio
 
 
-class FakeRedis:
-    def __init__(self) -> None:
-        self.store: dict[str, object] = {}
-
-    async def get(self, key: str) -> object | None:
-        return self.store.get(key)
-
-    async def set(self, key: str, value: object, ex: int | None = None) -> bool:
-        self.store[key] = value
-        return True
-
-    async def delete(self, *keys: str) -> int:
-        removed = 0
-        for key in keys:
-            if key in self.store:
-                del self.store[key]
-                removed += 1
-        return removed
-
-    async def incr(self, key: str) -> int:
-        current = self.store.get(key, 0)
-        value = int(current) + 1
-        self.store[key] = value
-        return value
-
-    async def expire(self, key: str, seconds: int) -> bool:
-        return True
-
-
 class FakeSession:
     async def commit(self) -> None:
         return None
 
-    async def refresh(self, obj: object) -> None:
+    async def refresh(self, obj: object, *args: object, **kwargs: object) -> None:
         return None
 
     async def flush(self) -> None:
@@ -84,11 +56,6 @@ def _make_role(libelle: str = "enseignant") -> Role:
 
 
 @pytest_asyncio.fixture
-async def fake_redis() -> FakeRedis:
-    return FakeRedis()
-
-
-@pytest_asyncio.fixture
 async def fake_session() -> FakeSession:
     return FakeSession()
 
@@ -99,15 +66,15 @@ async def user_store() -> dict[str, User]:
 
 
 @pytest_asyncio.fixture
-async def app(monkeypatch: pytest.MonkeyPatch, fake_redis: FakeRedis, fake_session: FakeSession, user_store: dict[str, User]):
+async def app(monkeypatch: pytest.MonkeyPatch, redis_client, fake_session: FakeSession, user_store: dict[str, User]):
     async def fake_get_session() -> FakeSession:
         yield fake_session
 
     async def fake_get_replica_session() -> FakeSession:
         yield fake_session
 
-    async def fake_get_redis() -> FakeRedis:
-        return fake_redis
+    async def fake_get_redis():
+        return redis_client
 
     async def fake_get_by_email(email: str, session: object | None = None) -> User | None:
         return user_store.get(email)
@@ -142,7 +109,6 @@ async def app(monkeypatch: pytest.MonkeyPatch, fake_redis: FakeRedis, fake_sessi
     monkeypatch.setattr(auth_service, "create_user", fake_create_user)
     monkeypatch.setattr(auth_service, "ensure_role_exists", fake_ensure_role_exists)
     monkeypatch.setattr(auth_router, "_get_user_by_id", fake_get_user_by_id)
-    monkeypatch.setattr(dependencies_auth, "redis_client", fake_redis)
     fastapi_app.dependency_overrides[get_session] = fake_get_session
     fastapi_app.dependency_overrides[get_replica_session] = fake_get_replica_session
     fastapi_app.dependency_overrides[get_redis] = fake_get_redis
@@ -171,6 +137,31 @@ async def _post_login(client: httpx.AsyncClient, email: str, password: str, stat
             "/api/v1/auth/login",
             json={"email": email, "password": password},
         )
+
+
+async def _post_login_real_db(
+    client: httpx.AsyncClient, email: str, password: str, status_code: int
+) -> httpx.Response:
+    response_payload = SimpleNamespace(status_code=status_code)
+
+    with patch("app.services.auth_service.httpx.AsyncClient") as mocked_async_client:
+        mocked_client = AsyncMock()
+        mocked_client.post = AsyncMock(return_value=response_payload)
+        mocked_async_client.return_value.__aenter__.return_value = mocked_client
+
+        return await client.post(
+            "/api/v1/auth/login",
+            json={"email": email, "password": password},
+        )
+
+
+async def _get_user_by_email(db_session, email: str) -> User | None:
+    result = await db_session.execute(
+        select(User).options(selectinload(User.roles)).where(User.email == email)
+    )
+    return result.scalar_one_or_none()
+
+
 async def test_login_success(client: httpx.AsyncClient, user_store: dict[str, User]) -> None:
     response = await _post_login(client, email="alice@junia.com", password="secret", status_code=200)
 
@@ -194,8 +185,38 @@ async def test_login_success(client: httpx.AsyncClient, user_store: dict[str, Us
     assert user_store["alice@junia.com"].id == UUID(user["id"])
 
 
+async def test_login_success_real_db(async_client: httpx.AsyncClient, db_session, redis_client) -> None:
+    response = await _post_login_real_db(async_client, email="alice@junia.com", password="secret", status_code=200)
+
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["token_type"] == "bearer"
+    assert data["access_token"]
+    assert data["refresh_token"]
+    assert validate_token(data["access_token"])["token_type"] == "access"
+    assert validate_token(data["refresh_token"])["token_type"] == "refresh"
+
+    user = await _get_user_by_email(db_session, "alice@junia.com")
+    assert user is not None
+    assert user.id == UUID(data["user"]["id"])
+    assert user.email == "alice@junia.com"
+    assert user.nom == "À compléter"
+    assert user.prenom == "À compléter"
+    assert user.actif is True
+    assert user.premier_login is True
+    assert user.created_at is not None
+    assert [role.libelle for role in user.roles] == ["enseignant"]
+
+    role_result = await db_session.execute(select(Role).where(Role.libelle == "enseignant"))
+    role = role_result.scalar_one_or_none()
+    assert role is not None
+    assert user.roles[0].id == role.id
+    assert redis_client.store[f"identity:session:{user.id}"]
+
+
 async def test_login_invalid_credentials(client: httpx.AsyncClient) -> None:
-    response = await _post_login(client, email="alice@junia.com", password="wrong", status_code=500)
+    response = await _post_login(client, email="alice@junia.com", password="wrongpw", status_code=500)
 
     assert response.status_code == 401
     assert response.json()["detail"] == "Authentication failed"
@@ -221,7 +242,7 @@ async def test_login_rate_limit(client: httpx.AsyncClient) -> None:
     assert responses[5].json()["detail"] == "Too many login attempts"
 
 
-async def test_logout(client: httpx.AsyncClient, fake_redis: FakeRedis) -> None:
+async def test_logout(client: httpx.AsyncClient, redis_client) -> None:
     login_response = await _post_login(client, email="alice@junia.com", password="secret", status_code=200)
     login_data = login_response.json()
     access_token = login_data["access_token"]
@@ -231,9 +252,28 @@ async def test_logout(client: httpx.AsyncClient, fake_redis: FakeRedis) -> None:
     response = await client.post("/api/v1/auth/logout", headers={"Authorization": f"Bearer {access_token}"})
 
     assert response.status_code == 204
-    assert fake_redis.store[f"identity:blacklist:{access_token}"] == "1"
-    assert fake_redis.store[f"identity:blacklist:{refresh_token}"] == "1"
-    assert f"identity:session:{user_id}" not in fake_redis.store
+    assert redis_client.store[f"identity:blacklist:{access_token}"] == "1"
+    assert redis_client.store[f"identity:blacklist:{refresh_token}"] == "1"
+    assert f"identity:session:{user_id}" not in redis_client.store
+
+
+async def test_logout_real_db(async_client: httpx.AsyncClient, db_session, redis_client) -> None:
+    login_response = await _post_login_real_db(async_client, email="alice@junia.com", password="secret", status_code=200)
+    login_data = login_response.json()
+    access_token = login_data["access_token"]
+    refresh_token = login_data["refresh_token"]
+    user_id = str(validate_token(access_token)["user_id"])
+
+    response = await async_client.post("/api/v1/auth/logout", headers={"Authorization": f"Bearer {access_token}"})
+
+    assert response.status_code == 204
+    assert redis_client.store[f"identity:blacklist:{access_token}"] == "1"
+    assert redis_client.store[f"identity:blacklist:{refresh_token}"] == "1"
+    assert f"identity:session:{user_id}" not in redis_client.store
+
+    user = await _get_user_by_email(db_session, "alice@junia.com")
+    assert user is not None
+    assert [role.libelle for role in user.roles] == ["enseignant"]
 
 
 async def test_me(client: httpx.AsyncClient) -> None:
@@ -249,6 +289,27 @@ async def test_me(client: httpx.AsyncClient) -> None:
     assert data["roles"] == ["enseignant"]
     assert data["actif"] is True
     assert data["premier_login"] is True
+
+
+async def test_me_real_db(async_client: httpx.AsyncClient, db_session, redis_client) -> None:
+    login_response = await _post_login_real_db(async_client, email="alice@junia.com", password="secret", status_code=200)
+    login_data = login_response.json()
+    access_token = login_data["access_token"]
+
+    response = await async_client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {access_token}"})
+
+    assert response.status_code == 200
+    data = response.json()
+
+    user = await _get_user_by_email(db_session, "alice@junia.com")
+    assert user is not None
+    assert data["id"] == str(user.id)
+    assert data["email"] == user.email
+    assert data["nom"] == user.nom
+    assert data["prenom"] == user.prenom
+    assert data["roles"] == [role.libelle for role in user.roles]
+    assert data["actif"] is user.actif
+    assert data["premier_login"] is user.premier_login
 
 
 async def test_me_invalid_token(client: httpx.AsyncClient) -> None:
@@ -275,3 +336,18 @@ async def test_refresh_token(client: httpx.AsyncClient) -> None:
     assert data["access_token"] != login_data["access_token"]
     assert validate_token(data["access_token"])["token_type"] == "access"
     assert validate_token(data["access_token"])["user_id"] == validate_token(refresh_token)["user_id"]
+
+
+async def test_refresh_token_after_logout_rejected(client: httpx.AsyncClient) -> None:
+    login_response = await _post_login(client, email="alice@junia.com", password="secret", status_code=200)
+    login_data = login_response.json()
+    access_token = login_data["access_token"]
+    refresh_token = login_data["refresh_token"]
+
+    logout_response = await client.post("/api/v1/auth/logout", headers={"Authorization": f"Bearer {access_token}"})
+    assert logout_response.status_code == 204
+
+    response = await client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token})
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid refresh token"
