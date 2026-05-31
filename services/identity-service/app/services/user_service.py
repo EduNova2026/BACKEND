@@ -55,8 +55,6 @@ async def create_user(
     )
     session.add(user)
     await session.flush()
-    await session.commit()
-    await session.refresh(user)
     return user
 
 
@@ -82,8 +80,6 @@ async def ensure_role_exists(session: AsyncSession, libelle: str) -> Role:
     role = Role(libelle=libelle)
     session.add(role)
     await session.flush()
-    await session.commit()
-    await session.refresh(role)
     return role
 
 

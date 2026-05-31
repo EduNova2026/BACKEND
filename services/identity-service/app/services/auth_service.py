@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import inspect
 import json
 from typing import Any
 
@@ -31,29 +30,7 @@ def _normalize_email(email: str) -> str:
     return str(validated).strip().lower()
 
 
-def _resolve_client_ip() -> str:
-    frame = inspect.currentframe()
-    try:
-        while frame is not None:
-            candidate = frame.f_locals.get("client_ip")
-            if isinstance(candidate, str) and candidate:
-                return candidate
-
-            request = frame.f_locals.get("request")
-            client = getattr(request, "client", None)
-            host = getattr(client, "host", None)
-            if isinstance(host, str) and host:
-                return host
-
-            frame = frame.f_back
-    finally:
-        del frame
-
-    return "unknown"
-
-
-async def _check_login_rate_limit(redis_client: Any) -> str:
-    client_ip = _resolve_client_ip()
+async def _check_login_rate_limit(redis_client: Any, client_ip: str) -> str:
     rate_limit_key = f"identity:login:rate-limit:{client_ip}"
     attempts = await redis_client.incr(rate_limit_key)
 
@@ -99,7 +76,7 @@ def _build_user_out(user: User) -> UserOut:
 
 
 async def _store_session(redis_client: Any, user: User, access_token: str, refresh_token: str) -> None:
-    ttl_seconds = settings.jwt_access_expiration_minutes * 60
+    ttl_seconds = settings.jwt_refresh_expiration_days * 86400
     session_key = f"identity:session:{user.id}"
     payload = {
         "user_id": str(user.id),
@@ -118,9 +95,10 @@ async def login(
     session: AsyncSession,
     replica_session: AsyncSession,
     redis_client: Any,
+    client_ip: str,
 ) -> LoginResponse:
     normalized_email = _normalize_email(email)
-    rate_limit_key = await _check_login_rate_limit(redis_client)
+    rate_limit_key = await _check_login_rate_limit(redis_client, client_ip)
 
     email_domain = normalized_email.rsplit("@", maxsplit=1)[-1]
     if email_domain == "student.junia.com" and settings.allow_student_bypass:
@@ -145,6 +123,7 @@ async def login(
             actif=True,
             premier_login=True,
         )
+        await session.refresh(user, attribute_names=["roles"])
     else:
         user = await _get_managed_user(session, existing_user.id)
         if user is None:

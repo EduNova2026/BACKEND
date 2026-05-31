@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Annotated, ClassVar
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import NoDecode, SettingsConfigDict
 
 from shared.config import AppSettings
@@ -19,7 +19,7 @@ class Settings(AppSettings):
     mauria_api_url: str = "https://mauria-api.fly.dev"
     mauria_login_path: str = "/aurion/login"
     allow_student_bypass: bool = False
-    jwt_secret: str = "change-me-in-production"
+    jwt_secret: str
     jwt_algorithm: str = "HS256"
     jwt_access_expiration_minutes: int = 60
     jwt_refresh_expiration_days: int = 7
@@ -37,6 +37,12 @@ class Settings(AppSettings):
         if isinstance(value, str):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
         return value
+
+    @model_validator(mode="after")
+    def validate_security_settings(self) -> "Settings":
+        if self.app_env == "production" and self.allow_student_bypass:
+            raise ValueError("ALLOW_STUDENT_BYPASS cannot be enabled in production")
+        return self
 
 
 @lru_cache

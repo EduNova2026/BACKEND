@@ -4,12 +4,13 @@ from collections.abc import Callable
 
 import jwt
 from fastapi import Depends, HTTPException, Request, status
+from redis.asyncio import Redis
 
-from app.redis_client import redis_client
+from app.redis_client import get_redis
 from app.services.jwt_service import validate_token
 
 
-async def get_current_user(request: Request) -> dict[str, object]:
+async def get_current_user(request: Request, redis: Redis = Depends(get_redis)) -> dict[str, object]:
     authorization = request.headers.get("Authorization", "")
     if not authorization.startswith("Bearer "):
         raise HTTPException(
@@ -25,7 +26,7 @@ async def get_current_user(request: Request) -> dict[str, object]:
         )
 
     blacklist_key = f"identity:blacklist:{token}"
-    if await redis_client.get(blacklist_key):
+    if await redis.get(blacklist_key):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token is invalid or expired",
