@@ -92,16 +92,19 @@ async def _get_user_by_id(session: AsyncSession, user_id: object) -> User | None
 @router.post("/login", response_model=LoginResponse)
 async def login(
     payload: LoginRequest,
+    request: Request,
     session: AsyncSession = Depends(get_session),
     replica_session: AsyncSession = Depends(get_replica_session),
     redis=Depends(get_redis),
 ) -> LoginResponse:
+    client_ip = request.client.host if request.client else "unknown"
     return await auth_login(
         email=payload.email,
         password=payload.password,
         session=session,
         replica_session=replica_session,
         redis_client=redis,
+        client_ip=client_ip,
     )
 
 
@@ -195,7 +198,30 @@ async def refresh(
             detail="Invalid refresh token",
         )
 
-    user = await _get_user_by_id(replica_session, token_payload.get("user_id"))
+    user_id = token_payload.get("user_id")
+    session_key = f"identity:session:{user_id}"
+    session_data = await redis.get(session_key)
+    if not session_data:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+        )
+
+    try:
+        session_payload = json.loads(session_data)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+        ) from exc
+
+    if session_payload.get("refresh_token") != payload.refresh_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+        )
+
+    user = await _get_user_by_id(replica_session, user_id)
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
