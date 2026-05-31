@@ -1,0 +1,35 @@
+# Zero-trust Docker context: ignore everything by default.
+*
+
+# Workspace metadata required by uv sync.
+!pyproject.toml
+!uv.lock
+
+# Shared package required by api-gateway.
+!packages/
+!packages/shared/
+!packages/shared/pyproject.toml
+!packages/shared/src/
+!packages/shared/src/**
+
+# api-gateway runtime package and Dockerfile.
+!services/
+!services/api-gateway/
+!services/api-gateway/Dockerfile
+!services/api-gateway/pyproject.toml
+!services/api-gateway/app/
+!services/api-gateway/app/**
+
+# identity-service runtime package, migrations, and Dockerfile.
+!services/identity-service/
+!services/identity-service/Dockerfile
+!services/identity-service/pyproject.toml
+!services/identity-service/app/
+!services/identity-service/app/**
+!services/identity-service/alembic/
+!services/identity-service/alembic/**
+
+# mauria-mock runtime package and Dockerfile.
+!services/mauria-mock/
+!services/mauria-mock/Dockerfile
+!services/mauria-mock/app.py
