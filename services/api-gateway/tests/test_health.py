@@ -1,6 +1,8 @@
 from fastapi.testclient import TestClient
+from pytest import MonkeyPatch
 
-from app.main import app
+from app.config import settings
+from app.main import app, create_app
 
 client = TestClient(app)
 
@@ -36,3 +38,11 @@ def test_gateway_status() -> None:
         "service": "api-gateway",
         "version": "0.1.0",
     }
+
+
+def test_openapi_is_disabled_in_production(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "app_env", "production")
+
+    production_app = create_app()
+
+    assert production_app.openapi_url is None
