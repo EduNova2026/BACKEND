@@ -18,9 +18,11 @@ COPY services/api-gateway/app services/api-gateway/app
 COPY services/identity-service/pyproject.toml services/identity-service/pyproject.toml
 COPY services/identity-service/app services/identity-service/app
 COPY services/identity-service/alembic services/identity-service/alembic
+COPY services/identity-service/docker-entrypoint.sh services/identity-service/docker-entrypoint.sh
 
 RUN uv sync --no-dev --package identity-service
+RUN chmod +x services/identity-service/docker-entrypoint.sh
 
 EXPOSE 8000
 
-CMD ["uv", "run", "--no-dev", "--package", "identity-service", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["services/identity-service/docker-entrypoint.sh"]
