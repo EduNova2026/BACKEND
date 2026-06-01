@@ -11,6 +11,7 @@ dependencies = [
 [tool.uv.sources]
 api-gateway = { workspace = true }
 identity-service = { workspace = true }
+import-service = {workspace = true}
 shared = { workspace = true }
 
 [tool.uv.workspace]
@@ -18,6 +19,7 @@ members = [
     "packages/shared",
     "services/api-gateway",
     "services/identity-service",
+    "services/import-service",
 ]
 
 [dependency-groups]
