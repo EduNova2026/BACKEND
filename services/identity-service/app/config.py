@@ -17,6 +17,7 @@ class Settings(AppSettings):
     database_replica_url: str | None = None
     redis_url: str = "redis://redis:6379/0"
     mauria_api_url: str = "https://mauria-api.fly.dev"
+    mauria_mock_url: str | None = None
     mauria_login_path: str = "/aurion/login"
     allow_student_bypass: bool = False
     jwt_secret: str

@@ -82,7 +82,7 @@ Run the service from the `backend/services/identity-service` directory.
 
 ### With Docker
 
-The container exposes the service on `http://localhost:8001` and maps to port `8000` inside the container.
+The container listens on port `8000` inside the Docker network only. It is not published on localhost; external clients must call the API Gateway on `http://localhost:8000`.
 
 ### Without Docker
 

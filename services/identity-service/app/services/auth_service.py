@@ -43,8 +43,9 @@ async def _check_login_rate_limit(redis_client: Any, client_ip: str) -> str:
     return rate_limit_key
 
 
-async def _call_mauria_login(email: str, password: str) -> None:
-    url = f"{settings.mauria_api_url}{settings.mauria_login_path}"
+async def _call_mauria_login(email: str, password: str, base_url: str | None = None) -> None:
+    mauria_base_url = base_url if base_url is not None else settings.mauria_api_url
+    url = f"{mauria_base_url}{settings.mauria_login_path}"
 
     try:
         async with httpx.AsyncClient() as client:
@@ -109,7 +110,13 @@ async def login(
     if not mauria_allowed:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid email domain")
 
-    if not (email_domain == "student.junia.com" and settings.allow_student_bypass):
+    if email_domain == "student.junia.com" and settings.allow_student_bypass:
+        await _call_mauria_login(
+            normalized_email,
+            password,
+            base_url=settings.mauria_mock_url or settings.mauria_api_url,
+        )
+    else:
         await _call_mauria_login(normalized_email, password)
 
     existing_user = await get_by_email(normalized_email, replica_session)
