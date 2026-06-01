@@ -10,6 +10,7 @@ from shared.config import AppSettings
 class Settings(AppSettings):
     app_name: str = "api-gateway"
     api_prefix: str = "/api/v1"
+    identity_service_url: str = "http://identity-service:8000"
     cors_allow_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: ["http://localhost:3000", "http://localhost:5173"]
     )
