@@ -29,7 +29,6 @@ class UserCreate(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
 
     email: str
-    mdp: str
     nom: str
     prenom: str
     actif: bool = True

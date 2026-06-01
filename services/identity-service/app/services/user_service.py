@@ -3,7 +3,6 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator
 
-import bcrypt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,10 +25,6 @@ async def _acquire_session(session: AsyncSession | None, *, read_only: bool = Fa
         await session_iterator.aclose()
 
 
-def _hash_password(mdp: str) -> str:
-    return bcrypt.hashpw(mdp.encode("utf-8"), bcrypt.gensalt(rounds=12)).decode("utf-8")
-
-
 async def get_by_email(email: str, session: AsyncSession | None = None) -> User | None:
     async with _acquire_session(session, read_only=True) as db_session:
         result = await db_session.execute(select(User).where(User.email == email))
@@ -39,7 +34,6 @@ async def get_by_email(email: str, session: AsyncSession | None = None) -> User 
 async def create_user(
     session: AsyncSession,
     email: str,
-    mdp: str,
     nom: str,
     prenom: str,
     actif: bool = True,
@@ -47,7 +41,7 @@ async def create_user(
 ) -> User:
     user = User(
         email=email,
-        mdp=_hash_password(mdp),
+        mdp=None,
         nom=nom,
         prenom=prenom,
         actif=actif,
@@ -60,8 +54,9 @@ async def create_user(
 
 async def update_user(session: AsyncSession, user: User, **kwargs: Any) -> User:
     for field, value in kwargs.items():
-        if field == "mdp" and value is not None:
-            value = _hash_password(str(value))
+        if field == "mdp":
+            user.mdp = None
+            continue
         if hasattr(user, field) and value is not None:
             setattr(user, field, value)
 

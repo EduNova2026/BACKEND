@@ -16,7 +16,7 @@ def upgrade() -> None:
         "utilisateurs",
         sa.Column("id", UUID(as_uuid=True), primary_key=True, nullable=False),
         sa.Column("email", sa.String(length=255), nullable=False),
-        sa.Column("mdp", sa.String(length=255), nullable=False),
+        sa.Column("mdp", sa.String(length=255), nullable=True),
         sa.Column("nom", sa.String(length=100), nullable=False),
         sa.Column("prenom", sa.String(length=100), nullable=False),
         sa.Column("actif", sa.Boolean(), nullable=False, server_default=sa.true()),
