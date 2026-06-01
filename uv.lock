@@ -870,11 +870,17 @@ name = "shared"
 version = "0.1.0"
 source = { editable = "packages/shared" }
 dependencies = [
+    { name = "email-validator" },
+    { name = "pydantic" },
     { name = "pydantic-settings" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "pydantic-settings", specifier = ">=2.5.0" }]
+requires-dist = [
+    { name = "email-validator", specifier = ">=2.1.0" },
+    { name = "pydantic", specifier = ">=2.0.0" },
+    { name = "pydantic-settings", specifier = ">=2.5.0" },
+]
 
 [[package]]
 name = "sqlalchemy"
