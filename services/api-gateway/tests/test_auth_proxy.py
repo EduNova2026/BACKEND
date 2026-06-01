@@ -225,6 +225,26 @@ def test_proxy_preserves_upstream_status(monkeypatch: MonkeyPatch) -> None:
     assert response.json() == {"detail": "Token is invalid or expired"}
 
 
+def test_me_without_authorization_is_forwarded_to_identity(monkeypatch: MonkeyPatch) -> None:
+    _patch_identity_url(monkeypatch)
+
+    async def handler(
+        _method: str,
+        _url: str,
+        _content: bytes,
+        _headers: dict[str, str],
+        _params: object,
+    ) -> httpx.Response:
+        return httpx.Response(401, json={"detail": "Invalid authentication credentials"})
+
+    _patch_async_client(monkeypatch, handler)
+
+    response = client.get("/api/v1/auth/me")
+
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Invalid authentication credentials"}
+
+
 def test_proxy_returns_bad_gateway_when_upstream_is_unavailable(monkeypatch: MonkeyPatch) -> None:
     _patch_identity_url(monkeypatch)
 
