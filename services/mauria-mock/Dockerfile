@@ -7,7 +7,7 @@ WORKDIR /app
 
 COPY services/mauria-mock/app.py /app/app.py
 
-RUN pip install --no-cache-dir fastapi uvicorn
+RUN pip install --no-cache-dir fastapi uvicorn httpx
 
 EXPOSE 8000
 
