@@ -7,6 +7,7 @@ from uuid import UUID
 
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from shared.schemas import ErrorResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -89,7 +90,15 @@ async def _get_user_by_id(session: AsyncSession, user_id: object) -> User | None
     return result.scalar_one_or_none()
 
 
-@router.post("/login", response_model=LoginResponse)
+@router.post(
+    "/login",
+    response_model=LoginResponse,
+    responses={
+        status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
+        status.HTTP_401_UNAUTHORIZED: {"model": ErrorResponse},
+        status.HTTP_429_TOO_MANY_REQUESTS: {"model": ErrorResponse},
+    },
+)
 async def login(
     payload: LoginRequest,
     request: Request,
@@ -108,7 +117,21 @@ async def login(
     )
 
 
-@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+@router.post(
+    "/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+    openapi_extra={
+        "parameters": [
+            {
+                "name": "Authorization",
+                "in": "header",
+                "required": True,
+                "schema": {"type": "string"},
+            }
+        ]
+    },
+    responses={status.HTTP_401_UNAUTHORIZED: {"model": ErrorResponse}},
+)
 async def logout(request: Request, redis=Depends(get_redis)) -> Response:
     token = _extract_bearer_token(request)
 
@@ -156,7 +179,21 @@ async def logout(request: Request, redis=Depends(get_redis)) -> Response:
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.get("/me", response_model=UserOut)
+@router.get(
+    "/me",
+    response_model=UserOut,
+    openapi_extra={
+        "parameters": [
+            {
+                "name": "Authorization",
+                "in": "header",
+                "required": True,
+                "schema": {"type": "string"},
+            }
+        ]
+    },
+    responses={status.HTTP_401_UNAUTHORIZED: {"model": ErrorResponse}},
+)
 async def me(
     current_user: dict[str, object] = Depends(get_current_user),
     replica_session: AsyncSession = Depends(get_replica_session),
@@ -171,7 +208,11 @@ async def me(
     return _build_user_out(user)
 
 
-@router.post("/refresh", response_model=RefreshResponse)
+@router.post(
+    "/refresh",
+    response_model=RefreshResponse,
+    responses={status.HTTP_401_UNAUTHORIZED: {"model": ErrorResponse}},
+)
 async def refresh(
     payload: RefreshRequest,
     redis=Depends(get_redis),

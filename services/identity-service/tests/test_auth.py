@@ -12,10 +12,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.database import get_replica_session, get_session
-from app.main import app as fastapi_app
+from app.config import settings
+from app.main import app as fastapi_app, create_app
 from app.models import Role, User
 from app.redis_client import get_redis
 from app.routers import auth as auth_router
+from app.schemas.auth import LoginRequest
 from app.services import auth_service
 from app.services.jwt_service import validate_token
 
@@ -220,6 +222,20 @@ async def test_login_invalid_credentials(client: httpx.AsyncClient) -> None:
 
     assert response.status_code == 401
     assert response.json()["detail"] == "Authentication failed"
+
+
+async def test_login_request_keeps_password_whitespace() -> None:
+    payload = LoginRequest(email="alice@junia.com", password=" secret ")
+
+    assert payload.password == " secret "
+
+
+async def test_openapi_is_disabled_in_production(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "app_env", "production")
+
+    production_app = create_app()
+
+    assert production_app.openapi_url is None
 
 
 async def test_login_invalid_email_domain(client: httpx.AsyncClient) -> None:

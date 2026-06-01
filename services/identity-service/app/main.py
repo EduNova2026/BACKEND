@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from shared.health import health_response
 from shared.logging import configure_logging
+from shared.schemas import HealthResponse
 
 from app.config import settings
 from app.database import engine, replica_engine, seed_roles
@@ -36,6 +37,7 @@ def create_app() -> FastAPI:
         version=settings.app_version,
         docs_url="/docs" if settings.app_env != "production" else None,
         redoc_url="/redoc" if settings.app_env != "production" else None,
+        openapi_url="/openapi.json" if settings.app_env != "production" else None,
         lifespan=lifespan,
     )
 
@@ -63,7 +65,13 @@ def create_app() -> FastAPI:
     def health_check() -> dict[str, str]:
         return health_response(settings.app_name)
 
-    app.add_api_route("/health", health_check, methods=["GET"], tags=["health"])
+    app.add_api_route(
+        "/health",
+        health_check,
+        methods=["GET"],
+        tags=["health"],
+        response_model=HealthResponse,
+    )
 
     return app
 
