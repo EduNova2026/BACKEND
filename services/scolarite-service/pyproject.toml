@@ -1,0 +1,25 @@
+[project]
+name = "scolarite-service"
+version = "0.1.0"
+description = "Service de gestion des promotions, groupes, etudiants et roles pour EDU'NOVA"
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.13.0",
+    "asyncpg>=0.29.0",
+    "fastapi>=0.115.0",
+    "httpx>=0.27.0",
+    "pydantic-settings>=2.5.0",
+    "shared",
+    "sqlalchemy[asyncio]>=2.0.0",
+    "uvicorn[standard]>=0.30.0",
+]
+
+[tool.uv.sources]
+shared = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]

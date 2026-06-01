@@ -7,6 +7,7 @@ members = [
     "api-gateway",
     "identity-service",
     "saas-backend",
+    "scolarite-service",
     "shared",
 ]
 
@@ -795,6 +796,33 @@ dev = [
     { name = "pytest", specifier = ">=8.0.0" },
     { name = "pytest-asyncio", specifier = ">=0.24.0" },
     { name = "ruff", specifier = ">=0.6.0" },
+]
+
+[[package]]
+name = "scolarite-service"
+version = "0.1.0"
+source = { editable = "services/scolarite-service" }
+dependencies = [
+    { name = "alembic" },
+    { name = "asyncpg" },
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "pydantic-settings" },
+    { name = "shared" },
+    { name = "sqlalchemy", extra = ["asyncio"] },
+    { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "alembic", specifier = ">=1.13.0" },
+    { name = "asyncpg", specifier = ">=0.29.0" },
+    { name = "fastapi", specifier = ">=0.115.0" },
+    { name = "httpx", specifier = ">=0.27.0" },
+    { name = "pydantic-settings", specifier = ">=2.5.0" },
+    { name = "shared", editable = "packages/shared" },
+    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.0" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.30.0" },
 ]
 
 [[package]]
