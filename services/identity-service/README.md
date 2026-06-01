@@ -63,7 +63,7 @@ The service uses PostgreSQL with a primary database and a replica for read traff
 - `utilisateurs`
   - `id` UUID primary key
   - `email` unique indexed email address
-  - `mdp` hashed password
+  - `mdp` nullable legacy column; passwords are not stored because authentication is delegated to Mauria
   - `nom`, `prenom`
   - `actif`, `premier_login`
   - `created_at`

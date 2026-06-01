@@ -19,7 +19,7 @@ class User(Base):
 
     id: Mapped[UUID] = mapped_column(PgUUID(as_uuid=True), primary_key=True, default=uuid4)
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
-    mdp: Mapped[str] = mapped_column(String(255), nullable=False)
+    mdp: Mapped[str | None] = mapped_column(String(255), nullable=True)
     nom: Mapped[str] = mapped_column(String(100), nullable=False)
     prenom: Mapped[str] = mapped_column(String(100), nullable=False)
     actif: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

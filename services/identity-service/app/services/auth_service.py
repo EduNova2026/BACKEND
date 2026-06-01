@@ -19,6 +19,7 @@ from app.services.user_service import create_user, ensure_role_exists, get_by_em
 
 
 _email_adapter = TypeAdapter(EmailStr)
+_ACCOUNT_DISABLED_MESSAGE = "Votre compte est désactivé veuillez contacter un administrateur"
 
 
 def _normalize_email(email: str) -> str:
@@ -28,6 +29,25 @@ def _normalize_email(email: str) -> str:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid email address") from exc
 
     return str(validated).strip().lower()
+
+
+def _format_name_part(value: str) -> str:
+    normalized = value.replace("_", "-").replace(" ", "-")
+    chunks = [chunk.capitalize() for chunk in normalized.split("-") if chunk]
+    return "-".join(chunks) if chunks else "À compléter"
+
+
+def _parse_name_from_email(email: str) -> tuple[str, str]:
+    local_part = email.split("@", maxsplit=1)[0].strip().lower()
+    parts = [part for part in local_part.split(".") if part]
+
+    if not parts:
+        return "À compléter", "À compléter"
+
+    if len(parts) == 1:
+        return _format_name_part(parts[0]), "À compléter"
+
+    return _format_name_part(parts[0]), _format_name_part("-".join(parts[1:]))
 
 
 async def _check_login_rate_limit(redis_client: Any, client_ip: str) -> str:
@@ -121,12 +141,12 @@ async def login(
 
     existing_user = await get_by_email(normalized_email, replica_session)
     if existing_user is None:
+        prenom, nom = _parse_name_from_email(normalized_email)
         user = await create_user(
             session=session,
             email=normalized_email,
-            mdp=password,
-            nom="À compléter",
-            prenom="À compléter",
+            nom=nom,
+            prenom=prenom,
             actif=True,
             premier_login=True,
         )
@@ -135,8 +155,13 @@ async def login(
         user = await _get_managed_user(session, existing_user.id)
         if user is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
-        if not user.actif:
-            user.actif = True
+
+    if not user.actif:
+        await redis_client.delete(rate_limit_key)
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_ACCOUNT_DISABLED_MESSAGE)
+
+    if user.premier_login:
+        user.premier_login = False
 
     teacher_role = await ensure_role_exists(session, "enseignant")
     if all(role.libelle != teacher_role.libelle for role in user.roles):

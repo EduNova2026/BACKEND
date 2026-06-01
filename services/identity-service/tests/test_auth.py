@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncIterator
 from types import SimpleNamespace
 from uuid import UUID, uuid4
 from unittest.mock import AsyncMock, patch
@@ -36,10 +37,10 @@ class FakeSession:
         return None
 
 
-def _make_user(email: str, password: str = "secret") -> User:
+def _make_user(email: str) -> User:
     user = User(
         email=email,
-        mdp=password,
+        mdp=None,
         nom="À compléter",
         prenom="À compléter",
         actif=True,
@@ -69,10 +70,10 @@ async def user_store() -> dict[str, User]:
 
 @pytest_asyncio.fixture
 async def app(monkeypatch: pytest.MonkeyPatch, redis_client, fake_session: FakeSession, user_store: dict[str, User]):
-    async def fake_get_session() -> FakeSession:
+    async def fake_get_session() -> AsyncIterator[FakeSession]:
         yield fake_session
 
-    async def fake_get_replica_session() -> FakeSession:
+    async def fake_get_replica_session() -> AsyncIterator[FakeSession]:
         yield fake_session
 
     async def fake_get_redis():
@@ -84,13 +85,12 @@ async def app(monkeypatch: pytest.MonkeyPatch, redis_client, fake_session: FakeS
     async def fake_create_user(
         session: object,
         email: str,
-        mdp: str,
         nom: str,
         prenom: str,
         actif: bool = True,
         premier_login: bool = True,
     ) -> User:
-        user = _make_user(email, mdp)
+        user = _make_user(email)
         user.nom = nom
         user.prenom = prenom
         user.actif = actif
@@ -107,9 +107,13 @@ async def app(monkeypatch: pytest.MonkeyPatch, redis_client, fake_session: FakeS
                 return user
         return None
 
+    async def fake_get_managed_user(session: object, user_id: object) -> User | None:
+        return await fake_get_user_by_id(session, user_id)
+
     monkeypatch.setattr(auth_service, "get_by_email", fake_get_by_email)
     monkeypatch.setattr(auth_service, "create_user", fake_create_user)
     monkeypatch.setattr(auth_service, "ensure_role_exists", fake_ensure_role_exists)
+    monkeypatch.setattr(auth_service, "_get_managed_user", fake_get_managed_user)
     monkeypatch.setattr(auth_router, "_get_user_by_id", fake_get_user_by_id)
     fastapi_app.dependency_overrides[get_session] = fake_get_session
     fastapi_app.dependency_overrides[get_replica_session] = fake_get_replica_session
@@ -165,7 +169,7 @@ async def _get_user_by_email(db_session, email: str) -> User | None:
 
 
 async def test_login_success(client: httpx.AsyncClient, user_store: dict[str, User]) -> None:
-    response = await _post_login(client, email="alice@junia.com", password="secret", status_code=200)
+    response = await _post_login(client, email="jean.dupont@junia.com", password="secret", status_code=200)
 
     assert response.status_code == 200
 
@@ -177,18 +181,19 @@ async def test_login_success(client: httpx.AsyncClient, user_store: dict[str, Us
     assert validate_token(data["refresh_token"])["token_type"] == "refresh"
 
     user = data["user"]
-    assert user["email"] == "alice@junia.com"
-    assert user["nom"] == "À compléter"
-    assert user["prenom"] == "À compléter"
+    assert user["email"] == "jean.dupont@junia.com"
+    assert user["nom"] == "Dupont"
+    assert user["prenom"] == "Jean"
     assert user["roles"] == ["enseignant"]
     assert user["actif"] is True
-    assert user["premier_login"] is True
-    assert "alice@junia.com" in user_store
-    assert user_store["alice@junia.com"].id == UUID(user["id"])
+    assert user["premier_login"] is False
+    assert "jean.dupont@junia.com" in user_store
+    assert user_store["jean.dupont@junia.com"].id == UUID(user["id"])
+    assert user_store["jean.dupont@junia.com"].mdp is None
 
 
 async def test_login_success_real_db(async_client: httpx.AsyncClient, db_session, redis_client) -> None:
-    response = await _post_login_real_db(async_client, email="alice@junia.com", password="secret", status_code=200)
+    response = await _post_login_real_db(async_client, email="jean.dupont@junia.com", password="secret", status_code=200)
 
     assert response.status_code == 200
 
@@ -199,14 +204,15 @@ async def test_login_success_real_db(async_client: httpx.AsyncClient, db_session
     assert validate_token(data["access_token"])["token_type"] == "access"
     assert validate_token(data["refresh_token"])["token_type"] == "refresh"
 
-    user = await _get_user_by_email(db_session, "alice@junia.com")
+    user = await _get_user_by_email(db_session, "jean.dupont@junia.com")
     assert user is not None
     assert user.id == UUID(data["user"]["id"])
-    assert user.email == "alice@junia.com"
-    assert user.nom == "À compléter"
-    assert user.prenom == "À compléter"
+    assert user.email == "jean.dupont@junia.com"
+    assert user.nom == "Dupont"
+    assert user.prenom == "Jean"
+    assert user.mdp is None
     assert user.actif is True
-    assert user.premier_login is True
+    assert user.premier_login is False
     assert user.created_at is not None
     assert [role.libelle for role in user.roles] == ["enseignant"]
 
@@ -222,6 +228,23 @@ async def test_login_invalid_credentials(client: httpx.AsyncClient) -> None:
 
     assert response.status_code == 401
     assert response.json()["detail"] == "Authentication failed"
+
+
+async def test_login_disabled_account_is_rejected(
+    client: httpx.AsyncClient, user_store: dict[str, User], redis_client
+) -> None:
+    user = _make_user("jean.dupont@junia.com")
+    user.actif = False
+    user.premier_login = False
+    user_store[user.email] = user
+
+    response = await _post_login(client, email=user.email, password="secret", status_code=200)
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Votre compte est désactivé veuillez contacter un administrateur"
+    assert user.actif is False
+    assert user.premier_login is False
+    assert f"identity:session:{user.id}" not in redis_client.store
 
 
 async def test_login_request_keeps_password_whitespace() -> None:
@@ -304,7 +327,7 @@ async def test_me(client: httpx.AsyncClient) -> None:
     assert data["email"] == "alice@junia.com"
     assert data["roles"] == ["enseignant"]
     assert data["actif"] is True
-    assert data["premier_login"] is True
+    assert data["premier_login"] is False
 
 
 async def test_me_real_db(async_client: httpx.AsyncClient, db_session, redis_client) -> None:
