@@ -180,3 +180,7 @@ pyrightconfig.json
 # uv 
 
 .python-version
+
+# ai
+.ai-agents/
+.omo/
