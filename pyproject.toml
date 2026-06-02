@@ -1,0 +1,43 @@
+[project]
+name = "saas-backend"
+version = "0.1.0"
+description = "Backend monorepo for EDU'NOVA services"
+requires-python = ">=3.12"
+dependencies = [
+    "api-gateway",
+    "shared",
+]
+
+[tool.uv.sources]
+api-gateway = { workspace = true }
+identity-service = { workspace = true }
+scolarite-service = { workspace = true }
+shared = { workspace = true }
+
+[tool.uv.workspace]
+members = [
+    "packages/shared",
+    "services/api-gateway",
+    "services/identity-service",
+    "services/scolarite-service",
+]
+
+[dependency-groups]
+dev = [
+    "basedpyright>=1.39.6",
+    "httpx2>=2.2.0",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "ruff>=0.6.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.pytest.ini_options]
+testpaths = ["services"]
+pythonpath = [
+    "packages/shared/src",
+    "services/api-gateway",
+]
