@@ -83,11 +83,17 @@ async def run_import(
             })
             continue
 
+        if ligne.absent:
+            motif = (ligne.motif_absence or "").lower()
+            valeur = 0.0 if "non excus" in motif else None
+        else:
+            valeur = ligne.valeur
+
         note = Note(
             etudiant_id=etudiant_id,
             examen_id=examen.id,
             matiere_id=enseignement.matiere_id,
-            valeur=ligne.valeur,
+            valeur=valeur,
             absent=ligne.absent,
             motif_absence=ligne.motif_absence,
             appreciation=ligne.appreciation or None,
