@@ -1,0 +1,8 @@
+name: Local
+variables:
+  - name: host
+    value: http://localhost:8000
+  - secret: true
+    name: passwd
+  - secret: true
+    name: email
