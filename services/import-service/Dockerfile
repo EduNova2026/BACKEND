@@ -13,6 +13,9 @@ COPY pyproject.toml ./
 COPY uv.lock ./
 COPY packages/shared/pyproject.toml packages/shared/pyproject.toml
 COPY packages/shared/src packages/shared/src
+COPY services/api-gateway/pyproject.toml services/api-gateway/pyproject.toml
+COPY services/identity-service/pyproject.toml services/identity-service/pyproject.toml
+COPY services/scolarite-service/pyproject.toml services/scolarite-service/pyproject.toml
 COPY services/import-service/pyproject.toml services/import-service/pyproject.toml
 COPY services/import-service/app services/import-service/app
 COPY services/import-service/alembic services/import-service/alembic
