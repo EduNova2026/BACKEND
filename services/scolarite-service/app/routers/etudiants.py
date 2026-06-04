@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+import unicodedata
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -9,17 +11,54 @@ from sqlalchemy.orm import selectinload
 from shared.schemas import ErrorResponse
 
 from app.database import get_replica_session, get_session
-from app.external_models import UtilisateurRef
-from app.models import Etudiant, Groupe, Promotion, etudiant_groupes
+from app.models import Etudiant, Groupe, etudiant_groupes
 from app.schemas import (
     EtudiantCreate,
     EtudiantGroupeOut,
     EtudiantOut,
+    EtudiantSearchResponse,
     EtudiantUpdate,
     GroupeOut,
 )
+from app.services.promotion_membership import (
+    ensure_promotion_reassignment_allowed,
+    get_promotion_or_404,
+)
 
 router = APIRouter(prefix="/etudiants", tags=["etudiants"])
+
+
+def normalize_name(value: str) -> str:
+    without_accents = "".join(
+        char
+        for char in unicodedata.normalize("NFKD", value.strip().casefold())
+        if not unicodedata.combining(char)
+    )
+    return re.sub(r"[\s\-']+", " ", without_accents).strip()
+
+
+def apply_etudiant_name(etudiant: Etudiant, nom: str, prenom: str) -> None:
+    etudiant.nom = normalize_name(nom)
+    etudiant.prenom = normalize_name(prenom)
+
+
+async def ensure_promotion_exists(session: AsyncSession, promotion_id: UUID) -> None:
+    await get_promotion_or_404(session, promotion_id)
+
+
+def etudiant_search_query(
+    promotion_id: UUID | None,
+    nom: str | None,
+    prenom: str | None,
+):
+    query = select(Etudiant)
+    if promotion_id is not None:
+        query = query.where(Etudiant.promotion_id == promotion_id)
+    if nom is not None:
+        query = query.where(Etudiant.nom == normalize_name(nom))
+    if prenom is not None:
+        query = query.where(Etudiant.prenom == normalize_name(prenom))
+    return query.order_by(Etudiant.nom, Etudiant.prenom, Etudiant.id)
 
 
 @router.get(
@@ -27,9 +66,12 @@ router = APIRouter(prefix="/etudiants", tags=["etudiants"])
     response_model=list[EtudiantOut],
 )
 async def list_etudiants(
+    promotion_id: UUID | None = None,
+    nom: str | None = None,
+    prenom: str | None = None,
     replica_session: AsyncSession = Depends(get_replica_session),
 ) -> list[EtudiantOut]:
-    result = await replica_session.scalars(select(Etudiant).order_by(Etudiant.utilisateur_id))
+    result = await replica_session.scalars(etudiant_search_query(promotion_id, nom, prenom))
     return result.all()
 
 
@@ -37,30 +79,66 @@ async def list_etudiants(
     "/",
     response_model=EtudiantOut,
     status_code=status.HTTP_201_CREATED,
-    responses={status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse}},
+    responses={
+        status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
+    },
 )
 async def create_etudiant(
     payload: EtudiantCreate,
     session: AsyncSession = Depends(get_session),
 ) -> EtudiantOut:
-    utilisateur = await session.get(UtilisateurRef, payload.utilisateur_id)
-    if utilisateur is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Utilisateur not found")
-    if not utilisateur.actif:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Utilisateur is inactive")
-
-    promotion = await session.get(Promotion, payload.promotion_id)
-    if promotion is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Promotion not found")
+    await ensure_promotion_exists(session, payload.promotion_id)
 
     etudiant = Etudiant(
-        utilisateur_id=payload.utilisateur_id,
         promotion_id=payload.promotion_id,
+        nom=normalize_name(payload.nom),
+        prenom=normalize_name(payload.prenom),
     )
     session.add(etudiant)
     await session.commit()
     await session.refresh(etudiant)
     return etudiant
+
+
+@router.get(
+    "/search",
+    response_model=EtudiantSearchResponse,
+)
+async def search_etudiants(
+    promotion_id: UUID,
+    nom: str,
+    prenom: str,
+    replica_session: AsyncSession = Depends(get_replica_session),
+) -> EtudiantSearchResponse:
+    items = (await replica_session.scalars(etudiant_search_query(promotion_id, nom, prenom))).all()
+    return EtudiantSearchResponse(items=items, count=len(items))
+
+
+@router.get(
+    "/resolve",
+    response_model=EtudiantOut,
+    responses={
+        status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
+    },
+)
+async def resolve_etudiant(
+    promotion_id: UUID,
+    nom: str,
+    prenom: str,
+    replica_session: AsyncSession = Depends(get_replica_session),
+) -> EtudiantOut:
+    items = (await replica_session.scalars(etudiant_search_query(promotion_id, nom, prenom))).all()
+    if len(items) == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Etudiant not found")
+    if len(items) > 1:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "message": "Multiple etudiants match this identity",
+                "matches_count": len(items),
+            },
+        )
+    return items[0]
 
 
 @router.get(
@@ -82,8 +160,8 @@ async def get_etudiant(
     "/{etudiant_id}",
     response_model=EtudiantOut,
     responses={
-        status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
         status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
+        status.HTTP_409_CONFLICT: {"model": ErrorResponse},
     },
 )
 async def update_etudiant(
@@ -96,13 +174,19 @@ async def update_etudiant(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Etudiant not found")
 
     update_data = payload.model_dump(exclude_unset=True)
+
     if "promotion_id" in update_data:
-        promotion = await session.get(Promotion, update_data["promotion_id"])
-        if promotion is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Promotion not found")
+        await ensure_promotion_reassignment_allowed(session, etudiant, update_data["promotion_id"])
 
     for field, value in update_data.items():
+        if field in {"nom", "prenom"}:
+            continue
         setattr(etudiant, field, value)
+    apply_etudiant_name(
+        etudiant,
+        update_data.get("nom", etudiant.nom),
+        update_data.get("prenom", etudiant.prenom),
+    )
 
     await session.commit()
     await session.refresh(etudiant)
@@ -136,9 +220,7 @@ async def list_etudiant_groupes(
     replica_session: AsyncSession = Depends(get_replica_session),
 ) -> list[GroupeOut]:
     etudiant = await replica_session.scalar(
-        select(Etudiant)
-        .options(selectinload(Etudiant.groupes))
-        .where(Etudiant.id == etudiant_id)
+        select(Etudiant).options(selectinload(Etudiant.groupes)).where(Etudiant.id == etudiant_id)
     )
     if etudiant is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Etudiant not found")
@@ -153,6 +235,7 @@ async def list_etudiant_groupes(
     responses={
         status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
         status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
+        status.HTTP_409_CONFLICT: {"model": ErrorResponse},
     },
 )
 async def add_etudiant_to_groupe(
@@ -167,6 +250,11 @@ async def add_etudiant_to_groupe(
     groupe = await session.get(Groupe, groupe_id)
     if groupe is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Groupe not found")
+    if groupe.promotion_id != etudiant.promotion_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Etudiant can only be assigned to groupes from their promotion",
+        )
 
     link_exists = await session.scalar(
         select(etudiant_groupes.c.etudiant_id).where(

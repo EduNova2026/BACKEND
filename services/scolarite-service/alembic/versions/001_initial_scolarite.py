@@ -99,6 +99,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_table("etudiant_groupes")
+    op.drop_constraint("uq_etudiants_utilisateur_promotion", "etudiants", type_="unique")
     op.drop_index("ix_etudiants_utilisateur_id", table_name="etudiants")
     op.drop_table("etudiants")
     op.drop_table("groupes")

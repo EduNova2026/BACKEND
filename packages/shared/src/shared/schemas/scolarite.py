@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict
 
 # --- Promotion ---
 
+
 class PromotionCreate(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
 
@@ -31,6 +32,7 @@ class PromotionOut(BaseModel):
 
 
 # --- Groupe ---
+
 
 class GroupeCreate(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
@@ -56,16 +58,20 @@ class GroupeOut(BaseModel):
 
 # --- Etudiant ---
 
+
 class EtudiantCreate(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
 
-    utilisateur_id: UUID
+    nom: str
+    prenom: str
     promotion_id: UUID
 
 
 class EtudiantUpdate(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
 
+    nom: str | None = None
+    prenom: str | None = None
     promotion_id: UUID | None = None
 
 
@@ -73,11 +79,19 @@ class EtudiantOut(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
 
     id: UUID
-    utilisateur_id: UUID
+    nom: str
+    prenom: str
     promotion_id: UUID
+    utilisateur_id: UUID
+
+
+class EtudiantSearchResponse(BaseModel):
+    items: list[EtudiantOut]
+    count: int
 
 
 # --- EtudiantGroupe (join table, no separate PK) ---
+
 
 class EtudiantGroupeOut(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
@@ -87,6 +101,7 @@ class EtudiantGroupeOut(BaseModel):
 
 
 # --- Utilisateur Role Assignment ---
+
 
 class RoleAssignmentCreate(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
