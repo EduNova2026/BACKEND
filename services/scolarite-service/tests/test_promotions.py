@@ -9,6 +9,35 @@ from app.schemas import PromotionCreate
 pytestmark = pytest.mark.asyncio
 
 
+async def _create_promotion(
+    async_client: AsyncClient, nom: str = "ING-P", annee: str = "2025-2026"
+) -> str:
+    resp = await async_client.post(
+        "/api/v1/promotions/",
+        json=PromotionCreate(nom=nom, annee_scolaire=annee).model_dump(),
+    )
+    assert resp.status_code == 201
+    return resp.json()["id"]
+
+
+async def _create_etudiant(async_client: AsyncClient, promotion_id: str) -> str:
+    resp = await async_client.post(
+        "/api/v1/etudiants/",
+        json={"nom": "Dupont", "prenom": "Alice", "promotion_id": promotion_id},
+    )
+    assert resp.status_code == 201
+    return resp.json()["id"]
+
+
+async def _create_groupe(async_client: AsyncClient, promotion_id: str) -> str:
+    resp = await async_client.post(
+        "/api/v1/groupes/",
+        json={"nom": "TD1", "promotion_id": promotion_id},
+    )
+    assert resp.status_code == 201
+    return resp.json()["id"]
+
+
 async def test_create_promotion_returns_201(async_client: AsyncClient) -> None:
     payload = PromotionCreate(nom="ING1", annee_scolaire="2025-2026").model_dump()
 
@@ -93,3 +122,62 @@ async def test_get_non_existent_promotion_returns_404(async_client: AsyncClient)
     resp = await async_client.get(f"/api/v1/promotions/{uuid4()}")
 
     assert resp.status_code == 404
+
+
+async def test_enroll_etudiant_in_promotion_reassigns_when_no_groupes(
+    async_client: AsyncClient,
+) -> None:
+    first_promotion_id = await _create_promotion(async_client, nom="ING7")
+    second_promotion_id = await _create_promotion(async_client, nom="ING8")
+    etudiant_id = await _create_etudiant(async_client, first_promotion_id)
+
+    resp = await async_client.post(
+        f"/api/v1/promotions/{second_promotion_id}/etudiants/{etudiant_id}"
+    )
+
+    assert resp.status_code == 200
+    assert resp.json()["promotion_id"] == second_promotion_id
+
+
+async def test_enroll_etudiant_in_same_promotion_is_idempotent(
+    async_client: AsyncClient,
+) -> None:
+    promotion_id = await _create_promotion(async_client, nom="ING9")
+    etudiant_id = await _create_etudiant(async_client, promotion_id)
+
+    resp = await async_client.post(f"/api/v1/promotions/{promotion_id}/etudiants/{etudiant_id}")
+
+    assert resp.status_code == 200
+    assert resp.json()["promotion_id"] == promotion_id
+
+
+async def test_enroll_etudiant_rejects_promotion_change_when_groupes_exist(
+    async_client: AsyncClient,
+) -> None:
+    first_promotion_id = await _create_promotion(async_client, nom="ING10")
+    second_promotion_id = await _create_promotion(async_client, nom="ING11")
+    etudiant_id = await _create_etudiant(async_client, first_promotion_id)
+    groupe_id = await _create_groupe(async_client, first_promotion_id)
+    assign_resp = await async_client.post(f"/api/v1/etudiants/{etudiant_id}/groupes/{groupe_id}")
+    assert assign_resp.status_code == 201
+
+    resp = await async_client.post(
+        f"/api/v1/promotions/{second_promotion_id}/etudiants/{etudiant_id}"
+    )
+
+    assert resp.status_code == 409
+    assert resp.json()["detail"] == (
+        "Cannot change promotion while student is assigned to groupes. Remove groupes first."
+    )
+
+
+async def test_unenroll_etudiant_from_required_promotion_returns_409(
+    async_client: AsyncClient,
+) -> None:
+    promotion_id = await _create_promotion(async_client, nom="ING12")
+    etudiant_id = await _create_etudiant(async_client, promotion_id)
+
+    resp = await async_client.delete(f"/api/v1/promotions/{promotion_id}/etudiants/{etudiant_id}")
+
+    assert resp.status_code == 409
+    assert "promotion_id is required" in resp.json()["detail"]

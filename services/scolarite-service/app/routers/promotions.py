@@ -11,6 +11,11 @@ from shared.schemas import ErrorResponse
 from app.database import get_replica_session, get_session
 from app.models import Promotion
 from app.schemas import EtudiantOut, GroupeOut, PromotionCreate, PromotionOut, PromotionUpdate
+from app.services.promotion_membership import (
+    ensure_promotion_reassignment_allowed,
+    get_etudiant_or_404,
+    get_promotion_or_404,
+)
 
 router = APIRouter(prefix="/promotions", tags=["promotions"])
 
@@ -169,3 +174,54 @@ async def list_promotion_etudiants(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Promotion not found")
 
     return sorted(promotion.etudiants, key=lambda etudiant: str(etudiant.utilisateur_id))
+
+
+@router.post(
+    "/{promotion_id}/etudiants/{etudiant_id}",
+    response_model=EtudiantOut,
+    responses={
+        status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
+        status.HTTP_409_CONFLICT: {"model": ErrorResponse},
+    },
+)
+async def enroll_etudiant_in_promotion(
+    promotion_id: UUID,
+    etudiant_id: UUID,
+    session: AsyncSession = Depends(get_session),
+) -> EtudiantOut:
+    etudiant = await get_etudiant_or_404(session, etudiant_id)
+    await ensure_promotion_reassignment_allowed(session, etudiant, promotion_id)
+
+    etudiant.promotion_id = promotion_id
+    await session.commit()
+    await session.refresh(etudiant)
+    return etudiant
+
+
+@router.delete(
+    "/{promotion_id}/etudiants/{etudiant_id}",
+    responses={
+        status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
+        status.HTTP_409_CONFLICT: {"model": ErrorResponse},
+    },
+)
+async def unenroll_etudiant_from_promotion(
+    promotion_id: UUID,
+    etudiant_id: UUID,
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    await get_promotion_or_404(session, promotion_id)
+    etudiant = await get_etudiant_or_404(session, etudiant_id)
+    if etudiant.promotion_id != promotion_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Etudiant is not enrolled in this promotion",
+        )
+
+    raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail=(
+            "Cannot remove student from promotion because promotion_id is required. "
+            "Reassign the student to another promotion or delete the student."
+        ),
+    )
