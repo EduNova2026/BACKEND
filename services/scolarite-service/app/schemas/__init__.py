@@ -1,6 +1,4 @@
-from .auth import LoginRequest, LoginResponse, RefreshRequest, RefreshResponse, Token
-from .health import DetailedHealthResponse, ErrorResponse, GatewayStatusResponse, HealthResponse
-from .scolarite import (
+from shared.schemas import (
     EtudiantCreate,
     EtudiantGroupeOut,
     EtudiantOut,
@@ -14,31 +12,18 @@ from .scolarite import (
     RoleAssignmentCreate,
     UtilisateurRoleOut,
 )
-from .user import RoleOut, UserCreate, UserOut
 
 __all__ = [
-    "DetailedHealthResponse",
-    "ErrorResponse",
     "EtudiantCreate",
     "EtudiantGroupeOut",
     "EtudiantOut",
     "EtudiantUpdate",
-    "GatewayStatusResponse",
     "GroupeCreate",
     "GroupeOut",
     "GroupeUpdate",
-    "HealthResponse",
-    "LoginRequest",
-    "LoginResponse",
     "PromotionCreate",
     "PromotionOut",
     "PromotionUpdate",
-    "RefreshRequest",
-    "RefreshResponse",
     "RoleAssignmentCreate",
-    "RoleOut",
-    "Token",
-    "UserCreate",
-    "UserOut",
     "UtilisateurRoleOut",
 ]

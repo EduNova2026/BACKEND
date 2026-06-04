@@ -1,20 +1,12 @@
 from functools import lru_cache
-from typing import Annotated, ClassVar
 
-from pydantic import Field, field_validator, model_validator
-from pydantic_settings import NoDecode, SettingsConfigDict
+from pydantic import model_validator
 
-from shared.config import AppSettings
+from shared.config import DatabaseSettings
 
 
-class Settings(AppSettings):
+class Settings(DatabaseSettings):
     app_name: str = "identity-service"
-    api_prefix: str = "/api/v1"
-    cors_allow_origins: Annotated[list[str], NoDecode] = Field(
-        default_factory=lambda: ["http://localhost:3000", "http://localhost:5173"]
-    )
-    database_url: str | None = None
-    database_replica_url: str | None = None
     redis_url: str = "redis://redis:6379/0"
     mauria_api_url: str = "https://mauria-api.fly.dev"
     mauria_mock_url: str | None = None
@@ -26,18 +18,6 @@ class Settings(AppSettings):
     jwt_refresh_expiration_days: int = 7
     rate_limit_login_max: int = 5
     rate_limit_login_window: int = 60
-
-    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
-        env_file=None,
-        case_sensitive=False,
-    )
-
-    @field_validator("cors_allow_origins", mode="before")
-    @classmethod
-    def parse_cors_allow_origins(cls, value: object) -> object:
-        if isinstance(value, str):
-            return [origin.strip() for origin in value.split(",") if origin.strip()]
-        return value
 
     @model_validator(mode="after")
     def validate_security_settings(self) -> "Settings":
