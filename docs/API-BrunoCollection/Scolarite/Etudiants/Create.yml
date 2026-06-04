@@ -1,0 +1,26 @@
+info:
+  name: Create etudiant
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{host}}/api/v1/scolarite/etudiants/"
+  headers:
+    - name: Authorization
+      value: Bearer {{token}}
+  body:
+    type: json
+    data: |-
+      {
+        "nom": "Louf",
+        "prenom": "Arthur",
+        "promotion_id": "{{promotion_id}}"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

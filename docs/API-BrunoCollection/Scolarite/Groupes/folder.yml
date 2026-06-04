@@ -1,0 +1,7 @@
+info:
+  name: Groupes
+  type: folder
+  seq: 2
+
+request:
+  auth: inherit

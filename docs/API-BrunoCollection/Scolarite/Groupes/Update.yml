@@ -1,0 +1,25 @@
+info:
+  name: Update groupe
+  type: http
+  seq: 4
+
+http:
+  method: PATCH
+  url: "{{host}}/api/v1/scolarite/groupes/{{groupe_id}}"
+  headers:
+    - name: Authorization
+      value: Bearer {{token}}
+  body:
+    type: json
+    data: |-
+      {
+        "nom": "TransformationIntegrales",
+        "promotion_id": "{{promotion_id}}"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

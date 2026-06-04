@@ -1,0 +1,25 @@
+info:
+  name: Create promotion
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{host}}/api/v1/scolarite/promotions/"
+  headers:
+    - name: Authorization
+      value: Bearer {{token}}
+  body:
+    type: json
+    data: |-
+      {
+        "nom": "ISEN-CIR3",
+        "annee_scolaire": "2025-2026"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
