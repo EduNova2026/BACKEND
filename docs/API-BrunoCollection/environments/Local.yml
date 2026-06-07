@@ -18,3 +18,7 @@ variables:
     value: ""
   - name: role_id
     value: ""
+  - name: enseignant_id
+    value: ""
+  - name: responsable_id
+    value: ""

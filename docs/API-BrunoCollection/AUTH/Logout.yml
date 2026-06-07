@@ -8,7 +8,7 @@ http:
   url: "{{host}}/api/v1/auth/logout"
   headers:
     - name: Authorization
-      value: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNTVmNzZlODEtMTliNy00OGNjLTlkYzEtNjUyN2YzMjI3MzgyIiwiZW1haWwiOiJlbnpvLm1hY2Fqb25lQHN0dWRlbnQuanVuaWEuY29tIiwicm9sZXMiOlsiZW5zZWlnbmFudCJdLCJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiaWF0IjoxNzgwNDAwNjg0LCJleHAiOjE3ODA0MDQyODR9.BJtxMHDnqhPVHsTtkKCjYRalPkAcTID1OIgRjCR7pcI
+      value: Bearer {{token}}
   auth: inherit
 
 settings:

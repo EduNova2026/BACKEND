@@ -1,11 +1,11 @@
 info:
-  name: ME
+  name: List groupes by enseignant
   type: http
   seq: 4
 
 http:
   method: GET
-  url: "{{host}}/api/v1/auth/me"
+  url: "{{host}}/api/v1/scolarite/enseignants/{{enseignant_id}}/groupes"
   headers:
     - name: Authorization
       value: Bearer {{token}}
