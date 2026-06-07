@@ -13,14 +13,17 @@ from shared.schemas import (
     EtudiantOut,
     EtudiantSearchResponse,
     EtudiantUpdate,
+    EnseignantGroupeOut,
     GroupeCreate,
     GroupeOut,
     GroupeUpdate,
     PromotionCreate,
     PromotionOut,
     PromotionUpdate,
+    ResponsablePromotionOut,
     RoleAssignmentCreate,
     RoleOut,
+    UserActivationUpdate,
     UtilisateurRoleOut,
 )
 
@@ -439,6 +442,132 @@ async def remove_role_from_utilisateur(
     return await proxy_request(
         request,
         scolarite_url(f"roles/utilisateurs/{utilisateur_id}/roles/{role_id}"),
+    )
+
+
+@router.post(
+    "/groupes/{groupe_id}/enseignants/{enseignant_id}",
+    response_model=EnseignantGroupeOut,
+    status_code=status.HTTP_201_CREATED,
+    openapi_extra=AUTH_OPENAPI_EXTRA,
+    responses={status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse}},
+)
+async def assign_enseignant_to_groupe(
+    request: Request,
+    groupe_id: UUID,
+    enseignant_id: UUID,
+) -> Response:
+    return await proxy_request(
+        request,
+        scolarite_url(f"groupes/{groupe_id}/enseignants/{enseignant_id}"),
+    )
+
+
+@router.get(
+    "/groupes/{groupe_id}/enseignants",
+    response_model=list[EnseignantGroupeOut],
+    openapi_extra=AUTH_OPENAPI_EXTRA,
+    responses={status.HTTP_404_NOT_FOUND: {"model": ErrorResponse}},
+)
+async def list_groupe_enseignants(request: Request, groupe_id: UUID) -> Response:
+    return await proxy_request(request, scolarite_url(f"groupes/{groupe_id}/enseignants"))
+
+
+@router.delete(
+    "/groupes/{groupe_id}/enseignants/{enseignant_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    openapi_extra=AUTH_OPENAPI_EXTRA,
+    responses={status.HTTP_404_NOT_FOUND: {"model": ErrorResponse}},
+)
+async def remove_enseignant_from_groupe(
+    request: Request,
+    groupe_id: UUID,
+    enseignant_id: UUID,
+) -> Response:
+    return await proxy_request(
+        request,
+        scolarite_url(f"groupes/{groupe_id}/enseignants/{enseignant_id}"),
+    )
+
+
+@router.get(
+    "/enseignants/{enseignant_id}/groupes",
+    response_model=list[EnseignantGroupeOut],
+    openapi_extra=AUTH_OPENAPI_EXTRA,
+)
+async def list_enseignant_groupes(request: Request, enseignant_id: UUID) -> Response:
+    return await proxy_request(request, scolarite_url(f"enseignants/{enseignant_id}/groupes"))
+
+
+@router.post(
+    "/promotions/{promotion_id}/responsables/{responsable_id}",
+    response_model=ResponsablePromotionOut,
+    status_code=status.HTTP_201_CREATED,
+    openapi_extra=AUTH_OPENAPI_EXTRA,
+    responses={status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse}},
+)
+async def assign_responsable_to_promotion(
+    request: Request,
+    promotion_id: UUID,
+    responsable_id: UUID,
+) -> Response:
+    return await proxy_request(
+        request,
+        scolarite_url(f"promotions/{promotion_id}/responsables/{responsable_id}"),
+    )
+
+
+@router.get(
+    "/promotions/{promotion_id}/responsables",
+    response_model=list[ResponsablePromotionOut],
+    openapi_extra=AUTH_OPENAPI_EXTRA,
+    responses={status.HTTP_404_NOT_FOUND: {"model": ErrorResponse}},
+)
+async def list_promotion_responsables(request: Request, promotion_id: UUID) -> Response:
+    return await proxy_request(request, scolarite_url(f"promotions/{promotion_id}/responsables"))
+
+
+@router.delete(
+    "/promotions/{promotion_id}/responsables/{responsable_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    openapi_extra=AUTH_OPENAPI_EXTRA,
+    responses={status.HTTP_404_NOT_FOUND: {"model": ErrorResponse}},
+)
+async def remove_responsable_from_promotion(
+    request: Request,
+    promotion_id: UUID,
+    responsable_id: UUID,
+) -> Response:
+    return await proxy_request(
+        request,
+        scolarite_url(f"promotions/{promotion_id}/responsables/{responsable_id}"),
+    )
+
+
+@router.get(
+    "/responsables/{responsable_id}/promotions",
+    response_model=list[ResponsablePromotionOut],
+    openapi_extra=AUTH_OPENAPI_EXTRA,
+)
+async def list_responsable_promotions(request: Request, responsable_id: UUID) -> Response:
+    return await proxy_request(request, scolarite_url(f"responsables/{responsable_id}/promotions"))
+
+
+@router.patch(
+    "/utilisateurs/{utilisateur_id}/activation",
+    response_model=dict[str, UUID | bool],
+    openapi_extra=AUTH_OPENAPI_EXTRA,
+    responses={status.HTTP_404_NOT_FOUND: {"model": ErrorResponse}},
+)
+async def update_utilisateur_activation(
+    request: Request,
+    utilisateur_id: UUID,
+    payload: UserActivationUpdate,
+) -> Response:
+    _ = payload
+    return await proxy_request(
+        request,
+        scolarite_url(f"utilisateurs/{utilisateur_id}/activation"),
     )
 
 
