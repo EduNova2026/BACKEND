@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
-from sqlalchemy import String
+from sqlalchemy import Index, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -22,6 +22,11 @@ class Promotion(Base):
     )
     nom: Mapped[str] = mapped_column(String(100), nullable=False)
     annee_scolaire: Mapped[str] = mapped_column(String(9), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("nom", "annee_scolaire", name="uq_promotions_nom_annee"),
+        Index("ix_promotions_nom", "nom"),
+    )
 
     groupes: Mapped[list["Groupe"]] = relationship(
         back_populates="promotion", lazy="selectin"

@@ -1,0 +1,18 @@
+info:
+  name: Assign etudiant to groupe
+  type: http
+  seq: 7
+
+http:
+  method: POST
+  url: "{{host}}/api/v1/scolarite/etudiants/{{etudiant_id}}/groupes/{{groupe_id}}"
+  headers:
+    - name: Authorization
+      value: Bearer {{token}}
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

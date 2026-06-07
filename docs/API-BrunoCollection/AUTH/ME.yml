@@ -1,0 +1,18 @@
+info:
+  name: ME
+  type: http
+  seq: 4
+
+http:
+  method: GET
+  url: "{{host}}/api/v1/auth/me"
+  headers:
+    - name: Authorization
+      value: Bearer {{token}}
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

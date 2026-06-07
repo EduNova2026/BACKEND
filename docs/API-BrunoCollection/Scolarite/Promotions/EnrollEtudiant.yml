@@ -1,0 +1,18 @@
+info:
+  name: Enroll etudiant in promotion
+  type: http
+  seq: 8
+
+http:
+  method: POST
+  url: "{{host}}/api/v1/scolarite/promotions/{{promotion_id}}/etudiants/{{etudiant_id}}"
+  headers:
+    - name: Authorization
+      value: Bearer {{token}}
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,24 @@
+name: Local
+variables:
+  - name: host
+    value: http://localhost:8000
+  - secret: true
+    name: passwd
+  - secret: true
+    name: email
+  - secret: true
+    name: token
+  - name: promotion_id
+    value: 665186dc-300b-40f7-b04d-df204befaf93
+  - name: groupe_id
+    value: 814b8886-a8aa-4ff9-8bd0-de84b7f49753
+  - name: etudiant_id
+    value: 2034da95-1298-418c-a460-b8d352b9a0c7
+  - name: utilisateur_id
+    value: ""
+  - name: role_id
+    value: ""
+  - name: enseignant_id
+    value: ""
+  - name: responsable_id
+    value: ""
