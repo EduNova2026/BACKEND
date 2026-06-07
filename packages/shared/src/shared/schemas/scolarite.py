@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import ClassVar
+from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
@@ -98,6 +99,30 @@ class EtudiantGroupeOut(BaseModel):
 
     etudiant_id: UUID
     groupe_id: UUID
+
+
+class EnseignantGroupeOut(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
+
+    enseignant_id: UUID
+    groupe_id: UUID
+    assigned_by: UUID | None = None
+    created_at: datetime
+
+
+class ResponsablePromotionOut(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
+
+    responsable_id: UUID
+    promotion_id: UUID
+    assigned_by: UUID | None = None
+    created_at: datetime
+
+
+class UserActivationUpdate(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+
+    actif: bool
 
 
 # --- Utilisateur Role Assignment ---
