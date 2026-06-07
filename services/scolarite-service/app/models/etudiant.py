@@ -30,6 +30,7 @@ class Etudiant(Base):
     __table_args__ = (
         Index("ix_etudiants_promotion_id", "promotion_id"),
         Index("ix_etudiants_promotion_nom_prenom", "promotion_id", "nom", "prenom"),
+        Index("ix_etudiants_nom_prenom", "nom", "prenom"),
     )
 
     promotion: Mapped["Promotion"] = relationship(back_populates="etudiants")
