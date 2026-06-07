@@ -2,13 +2,16 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from shared.schemas import ErrorResponse
 
+from app.cache import cache_delete_pattern, cache_get_json, cache_set_json
+from app.config import settings
 from app.database import get_replica_session, get_session
+from app.dependencies.auth import CurrentUser, require_responsable_pedagogique
 from app.models import Promotion
 from app.schemas import EtudiantOut, GroupeOut, PromotionCreate, PromotionOut, PromotionUpdate
 from app.services.promotion_membership import (
@@ -25,10 +28,23 @@ router = APIRouter(prefix="/promotions", tags=["promotions"])
     response_model=list[PromotionOut],
 )
 async def list_promotions(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    _: CurrentUser = Depends(require_responsable_pedagogique),
     replica_session: AsyncSession = Depends(get_replica_session),
 ) -> list[PromotionOut]:
-    result = await replica_session.scalars(select(Promotion).order_by(Promotion.nom))
-    return result.all()
+    cache_key = f"scolarite:promotions:list:{skip}:{limit}"
+    cached = await cache_get_json(cache_key)
+    if cached is not None:
+        return [PromotionOut.model_validate(item) for item in cached]
+
+    result = await replica_session.scalars(
+        select(Promotion).order_by(Promotion.nom).offset(skip).limit(limit)
+    )
+    promotions = result.all()
+    response = [PromotionOut.model_validate(promotion) for promotion in promotions]
+    await cache_set_json(cache_key, response, settings.cache_reference_ttl_seconds)
+    return response
 
 
 @router.post(
@@ -39,6 +55,7 @@ async def list_promotions(
 )
 async def create_promotion(
     payload: PromotionCreate,
+    _: CurrentUser = Depends(require_responsable_pedagogique),
     session: AsyncSession = Depends(get_session),
 ) -> PromotionOut:
     duplicate = await session.scalar(
@@ -57,6 +74,7 @@ async def create_promotion(
     session.add(promotion)
     await session.commit()
     await session.refresh(promotion)
+    await cache_delete_pattern("scolarite:promotions:list:*")
     return promotion
 
 
@@ -67,6 +85,7 @@ async def create_promotion(
 )
 async def get_promotion(
     promotion_id: UUID,
+    _: CurrentUser = Depends(require_responsable_pedagogique),
     replica_session: AsyncSession = Depends(get_replica_session),
 ) -> PromotionOut:
     promotion = await replica_session.get(Promotion, promotion_id)
@@ -86,6 +105,7 @@ async def get_promotion(
 async def update_promotion(
     promotion_id: UUID,
     payload: PromotionUpdate,
+    _: CurrentUser = Depends(require_responsable_pedagogique),
     session: AsyncSession = Depends(get_session),
 ) -> PromotionOut:
     promotion = await session.get(Promotion, promotion_id)
@@ -116,6 +136,7 @@ async def update_promotion(
 
     await session.commit()
     await session.refresh(promotion)
+    await cache_delete_pattern("scolarite:promotions:list:*")
     return promotion
 
 
@@ -126,6 +147,7 @@ async def update_promotion(
 )
 async def delete_promotion(
     promotion_id: UUID,
+    _: CurrentUser = Depends(require_responsable_pedagogique),
     session: AsyncSession = Depends(get_session),
 ) -> None:
     promotion = await session.get(Promotion, promotion_id)
@@ -134,6 +156,7 @@ async def delete_promotion(
 
     await session.delete(promotion)
     await session.commit()
+    await cache_delete_pattern("scolarite:promotions:list:*")
 
 
 @router.get(
@@ -143,8 +166,14 @@ async def delete_promotion(
 )
 async def list_promotion_groupes(
     promotion_id: UUID,
+    _: CurrentUser = Depends(require_responsable_pedagogique),
     replica_session: AsyncSession = Depends(get_replica_session),
 ) -> list[GroupeOut]:
+    cache_key = f"scolarite:promotions:{promotion_id}:groupes"
+    cached = await cache_get_json(cache_key)
+    if cached is not None:
+        return [GroupeOut.model_validate(item) for item in cached]
+
     promotion = await replica_session.scalar(
         select(Promotion)
         .options(selectinload(Promotion.groupes))
@@ -153,7 +182,12 @@ async def list_promotion_groupes(
     if promotion is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Promotion not found")
 
-    return sorted(promotion.groupes, key=lambda groupe: groupe.nom)
+    response = [
+        GroupeOut.model_validate(groupe)
+        for groupe in sorted(promotion.groupes, key=lambda groupe: groupe.nom)
+    ]
+    await cache_set_json(cache_key, response, settings.cache_reference_ttl_seconds)
+    return response
 
 
 @router.get(
@@ -163,6 +197,7 @@ async def list_promotion_groupes(
 )
 async def list_promotion_etudiants(
     promotion_id: UUID,
+    _: CurrentUser = Depends(require_responsable_pedagogique),
     replica_session: AsyncSession = Depends(get_replica_session),
 ) -> list[EtudiantOut]:
     promotion = await replica_session.scalar(
@@ -187,6 +222,7 @@ async def list_promotion_etudiants(
 async def enroll_etudiant_in_promotion(
     promotion_id: UUID,
     etudiant_id: UUID,
+    _: CurrentUser = Depends(require_responsable_pedagogique),
     session: AsyncSession = Depends(get_session),
 ) -> EtudiantOut:
     etudiant = await get_etudiant_or_404(session, etudiant_id)
@@ -208,6 +244,7 @@ async def enroll_etudiant_in_promotion(
 async def unenroll_etudiant_from_promotion(
     promotion_id: UUID,
     etudiant_id: UUID,
+    _: CurrentUser = Depends(require_responsable_pedagogique),
     session: AsyncSession = Depends(get_session),
 ) -> None:
     await get_promotion_or_404(session, promotion_id)

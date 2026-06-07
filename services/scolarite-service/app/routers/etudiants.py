@@ -4,13 +4,20 @@ import re
 import unicodedata
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import delete, insert, select
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import delete, func, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from shared.schemas import ErrorResponse
 
 from app.database import get_replica_session, get_session
+from app.dependencies.auth import (
+    CurrentUser,
+    ensure_can_access_etudiant,
+    get_current_user,
+    is_responsable_pedagogique,
+    require_responsable_pedagogique,
+)
 from app.models import Etudiant, Groupe, etudiant_groupes
 from app.schemas import (
     EtudiantCreate,
@@ -69,9 +76,14 @@ async def list_etudiants(
     promotion_id: UUID | None = None,
     nom: str | None = None,
     prenom: str | None = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    _: CurrentUser = Depends(require_responsable_pedagogique),
     replica_session: AsyncSession = Depends(get_replica_session),
 ) -> list[EtudiantOut]:
-    result = await replica_session.scalars(etudiant_search_query(promotion_id, nom, prenom))
+    result = await replica_session.scalars(
+        etudiant_search_query(promotion_id, nom, prenom).offset(skip).limit(limit)
+    )
     return result.all()
 
 
@@ -85,6 +97,7 @@ async def list_etudiants(
 )
 async def create_etudiant(
     payload: EtudiantCreate,
+    _: CurrentUser = Depends(require_responsable_pedagogique),
     session: AsyncSession = Depends(get_session),
 ) -> EtudiantOut:
     await ensure_promotion_exists(session, payload.promotion_id)
@@ -108,10 +121,14 @@ async def search_etudiants(
     promotion_id: UUID,
     nom: str,
     prenom: str,
+    _: CurrentUser = Depends(require_responsable_pedagogique),
     replica_session: AsyncSession = Depends(get_replica_session),
 ) -> EtudiantSearchResponse:
-    items = (await replica_session.scalars(etudiant_search_query(promotion_id, nom, prenom))).all()
-    return EtudiantSearchResponse(items=items, count=len(items))
+    filtered_query = etudiant_search_query(promotion_id, nom, prenom)
+    count_query = select(func.count()).select_from(filtered_query.order_by(None).subquery())
+    count = await replica_session.scalar(count_query)
+    items = (await replica_session.scalars(filtered_query.limit(100))).all()
+    return EtudiantSearchResponse(items=items, count=count or 0)
 
 
 @router.get(
@@ -125,9 +142,12 @@ async def resolve_etudiant(
     promotion_id: UUID,
     nom: str,
     prenom: str,
+    _: CurrentUser = Depends(require_responsable_pedagogique),
     replica_session: AsyncSession = Depends(get_replica_session),
 ) -> EtudiantOut:
-    items = (await replica_session.scalars(etudiant_search_query(promotion_id, nom, prenom))).all()
+    items = (
+        await replica_session.scalars(etudiant_search_query(promotion_id, nom, prenom).limit(2))
+    ).all()
     if len(items) == 0:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Etudiant not found")
     if len(items) > 1:
@@ -148,11 +168,13 @@ async def resolve_etudiant(
 )
 async def get_etudiant(
     etudiant_id: UUID,
+    current_user: CurrentUser = Depends(get_current_user),
     replica_session: AsyncSession = Depends(get_replica_session),
 ) -> EtudiantOut:
     etudiant = await replica_session.get(Etudiant, etudiant_id)
     if etudiant is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Etudiant not found")
+    await ensure_can_access_etudiant(replica_session, current_user, etudiant_id)
     return etudiant
 
 
@@ -167,15 +189,22 @@ async def get_etudiant(
 async def update_etudiant(
     etudiant_id: UUID,
     payload: EtudiantUpdate,
+    current_user: CurrentUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> EtudiantOut:
     etudiant = await session.get(Etudiant, etudiant_id)
     if etudiant is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Etudiant not found")
+    await ensure_can_access_etudiant(session, current_user, etudiant_id)
 
     update_data = payload.model_dump(exclude_unset=True)
 
     if "promotion_id" in update_data:
+        if not is_responsable_pedagogique(current_user):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions",
+            )
         await ensure_promotion_reassignment_allowed(session, etudiant, update_data["promotion_id"])
 
     for field, value in update_data.items():
@@ -200,6 +229,7 @@ async def update_etudiant(
 )
 async def delete_etudiant(
     etudiant_id: UUID,
+    _: CurrentUser = Depends(require_responsable_pedagogique),
     session: AsyncSession = Depends(get_session),
 ) -> None:
     etudiant = await session.get(Etudiant, etudiant_id)
@@ -217,6 +247,7 @@ async def delete_etudiant(
 )
 async def list_etudiant_groupes(
     etudiant_id: UUID,
+    current_user: CurrentUser = Depends(get_current_user),
     replica_session: AsyncSession = Depends(get_replica_session),
 ) -> list[GroupeOut]:
     etudiant = await replica_session.scalar(
@@ -224,6 +255,7 @@ async def list_etudiant_groupes(
     )
     if etudiant is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Etudiant not found")
+    await ensure_can_access_etudiant(replica_session, current_user, etudiant_id)
 
     return sorted(etudiant.groupes, key=lambda groupe: groupe.nom)
 
@@ -241,6 +273,7 @@ async def list_etudiant_groupes(
 async def add_etudiant_to_groupe(
     etudiant_id: UUID,
     groupe_id: UUID,
+    _: CurrentUser = Depends(require_responsable_pedagogique),
     session: AsyncSession = Depends(get_session),
 ) -> EtudiantGroupeOut:
     etudiant = await session.get(Etudiant, etudiant_id)
@@ -283,6 +316,7 @@ async def add_etudiant_to_groupe(
 async def remove_etudiant_from_groupe(
     etudiant_id: UUID,
     groupe_id: UUID,
+    _: CurrentUser = Depends(require_responsable_pedagogique),
     session: AsyncSession = Depends(get_session),
 ) -> None:
     etudiant = await session.get(Etudiant, etudiant_id)

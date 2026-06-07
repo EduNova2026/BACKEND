@@ -9,7 +9,15 @@ from shared.schemas import HealthResponse
 
 from app.config import settings
 from app.database import engine, replica_engine
-from app.routers import promotions_router, groupes_router, etudiants_router, roles_router
+from app.redis_client import close_redis
+from app.routers import (
+    assignments_router,
+    promotions_router,
+    groupes_router,
+    etudiants_router,
+    roles_router,
+    utilisateurs_router,
+)
 
 
 def create_app() -> FastAPI:
@@ -18,6 +26,7 @@ def create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
         yield
+        await close_redis()
         if replica_engine is not None and replica_engine is not engine:
             await replica_engine.dispose()
         if engine is not None:
@@ -57,6 +66,8 @@ def create_app() -> FastAPI:
     app.include_router(groupes_router, prefix=settings.api_prefix)
     app.include_router(etudiants_router, prefix=settings.api_prefix)
     app.include_router(roles_router, prefix=settings.api_prefix)
+    app.include_router(assignments_router, prefix=settings.api_prefix)
+    app.include_router(utilisateurs_router, prefix=settings.api_prefix)
 
     def health_check() -> dict[str, str]:
         return health_response(settings.app_name)
