@@ -17,6 +17,7 @@ class Settings(AppSettings):
     )
     database_url: str | None = None
     database_replica_url: str | None = None
+    scolarite_service_url: str = "http://scolarite-service:8000"
     jwt_secret: str
     jwt_algorithm: str = "HS256"
 

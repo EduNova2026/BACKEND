@@ -2,14 +2,42 @@ from __future__ import annotations
 
 from uuid import UUID
 
+import httpx
+from fastapi import status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.examen import Examen
+from app.config import settings
 from app.models.import_job import ImportJob
-from app.models.note import Note
 from app.models.refs import EnseignementRef
 from app.services.csv_parser import parse_aurion_csv
 from app.services.matcher import find_etudiant_by_nom_prenom
+
+
+async def create_examen_in_scolarite(payload: dict[str, object], authorization: str) -> str:
+    url = f"{settings.scolarite_service_url.rstrip('/')}/api/v1/examens/"
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            url,
+            json=payload,
+            headers={"Authorization": authorization},
+            timeout=10,
+        )
+    if response.status_code != status.HTTP_201_CREATED:
+        raise RuntimeError(response.text)
+    return str(response.json()["id"])
+
+
+async def create_notes_in_scolarite(payload: dict[str, object], authorization: str) -> None:
+    url = f"{settings.scolarite_service_url.rstrip('/')}/api/v1/notes/batch"
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            url,
+            json=payload,
+            headers={"Authorization": authorization},
+            timeout=10,
+        )
+    if response.status_code != status.HTTP_201_CREATED:
+        raise RuntimeError(response.text)
 
 
 async def run_import(
@@ -17,6 +45,7 @@ async def run_import(
     nom_fichier: str,
     enseignement_id: UUID,
     importe_par: UUID,
+    authorization: str,
     session: AsyncSession,
     replica_session: AsyncSession,
 ) -> ImportJob:
@@ -44,21 +73,12 @@ async def run_import(
         await session.commit()
         return job
 
-    examen = Examen(
-        enseignement_id=enseignement_id,
-        nom=resultat.examen.libelle,
-        type="examen",
-        code_aurion=resultat.examen.code,
-        cree_par=importe_par,
-    )
-    session.add(examen)
-    await session.flush()
-
     erreurs = list(
         {"ligne": 1, "nom": "", "prenom": "", "raison": e}
         for e in resultat.erreurs_parsing
     )
     ok = 0
+    notes_payload: list[dict[str, object]] = []
 
     for ligne in resultat.lignes:
         etudiant_id = await find_etudiant_by_nom_prenom(
@@ -89,18 +109,39 @@ async def run_import(
         else:
             valeur = ligne.valeur
 
-        note = Note(
-            etudiant_id=etudiant_id,
-            examen_id=examen.id,
-            matiere_id=enseignement.matiere_id,
-            valeur=valeur,
-            absent=ligne.absent,
-            motif_absence=ligne.motif_absence,
-            appreciation=ligne.appreciation or None,
-            saisi_par=importe_par,
-        )
-        session.add(note)
+        notes_payload.append({
+            "etudiant_id": str(etudiant_id),
+            "valeur": valeur,
+            "absent": ligne.absent,
+            "motif_absence": ligne.motif_absence,
+        })
         ok += 1
+
+    if notes_payload:
+        try:
+            examen_id = await create_examen_in_scolarite(
+                {
+                    "enseignement_id": str(enseignement_id),
+                    "nom": resultat.examen.libelle,
+                    "type": "examen",
+                    "coefficient": 1.0,
+                    "note_max": 20.0,
+                    "code_aurion": resultat.examen.code,
+                },
+                authorization,
+            )
+            await create_notes_in_scolarite(
+                {
+                    "examen_id": examen_id,
+                    "notes": notes_payload,
+                },
+                authorization,
+            )
+        except RuntimeError as exc:
+            job.statut = "erreur"
+            job.erreurs_detail = [{"raison": f"Création des notes impossible: {exc}"}]
+            await session.commit()
+            return job
 
     job.lignes_total = len(resultat.lignes)
     job.lignes_ok = ok
