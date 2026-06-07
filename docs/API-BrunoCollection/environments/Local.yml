@@ -22,3 +22,11 @@ variables:
     value: ""
   - name: responsable_id
     value: ""
+  - name: enseignement_id
+    value: 1d9b681e-3956-4f2e-ac92-953d8ff95a97
+  - name: examen_id
+    value: ""
+  - name: note_id
+    value: ""
+  - name: import_job_id
+    value: ""

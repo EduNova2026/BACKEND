@@ -1,11 +1,11 @@
 info:
-  name: Create promotion
+  name: Create note
   type: http
-  seq: 4
+  seq: 2
 
 http:
   method: POST
-  url: "{{host}}/api/v1/scolarite/promotions/"
+  url: "{{host}}/api/v1/scolarite/notes/"
   headers:
     - name: Authorization
       value: Bearer {{token}}
@@ -13,8 +13,10 @@ http:
     type: json
     data: |-
       {
-        "nom": "ISEN-CIR3",
-        "annee_scolaire": "2025-2026"
+        "etudiant_id": "{{etudiant_id}}",
+        "examen_id": "{{examen_id}}",
+        "valeur": 15.5,
+        "absent": false
       }
   auth: inherit
 

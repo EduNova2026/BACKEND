@@ -1,21 +1,20 @@
 info:
-  name: Create promotion
+  name: Upload notes CSV
   type: http
-  seq: 4
+  seq: 3
 
 http:
   method: POST
-  url: "{{host}}/api/v1/scolarite/promotions/"
+  url: "{{host}}/api/v1/imports/upload?enseignement_id={{enseignement_id}}"
   headers:
     - name: Authorization
       value: Bearer {{token}}
   body:
-    type: json
-    data: |-
-      {
-        "nom": "ISEN-CIR3",
-        "annee_scolaire": "2025-2026"
-      }
+    type: multipartForm
+    data:
+      - name: file
+        value: notes.csv
+        type: file
   auth: inherit
 
 settings:
