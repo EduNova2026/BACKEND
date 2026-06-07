@@ -11,6 +11,7 @@ from ..database import Base
 
 if TYPE_CHECKING:
     from .groupe import Groupe
+    from .note import Note
     from .promotion import Promotion
 
 
@@ -39,3 +40,4 @@ class Etudiant(Base):
         back_populates="etudiants",
         lazy="selectin",
     )
+    notes: Mapped[list["Note"]] = relationship(back_populates="etudiant")
