@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from datetime import datetime, timedelta, UTC
 import os
+from uuid import uuid4
 
+import jwt
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
@@ -10,11 +13,37 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.pool import StaticPool
 
 os.environ.setdefault("APP_NAME", "scolarite-service")
+os.environ.setdefault("JWT_SECRET", "test-secret")
 
 from app.database import Base, get_replica_session, get_session
 from app.main import app
 from app import models as _models  # noqa: F401
 from app.external_models import external_metadata
+
+
+def build_auth_headers(
+    user_id: str | None = None,
+    roles: list[str] | None = None,
+    email: str = "rp@example.com",
+) -> dict[str, str]:
+    token = jwt.encode(
+        {
+            "user_id": user_id or str(uuid4()),
+            "email": email,
+            "roles": roles or ["responsable_pedagogique"],
+            "token_type": "access",
+            "iat": datetime.now(UTC),
+            "exp": datetime.now(UTC) + timedelta(hours=1),
+        },
+        os.environ["JWT_SECRET"],
+        algorithm="HS256",
+    )
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def auth_headers_factory():
+    return build_auth_headers
 
 
 @pytest_asyncio.fixture(scope="session")
@@ -80,7 +109,11 @@ async def async_client(test_engine: AsyncEngine) -> AsyncIterator[AsyncClient]:
     app.dependency_overrides[get_replica_session] = override_get_replica_session
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://test",
+        headers=build_auth_headers(),
+    ) as client:
         yield client
 
     app.dependency_overrides.clear()
