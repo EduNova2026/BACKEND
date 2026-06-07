@@ -14,9 +14,15 @@ from shared.schemas import (
     EtudiantSearchResponse,
     EtudiantUpdate,
     EnseignantGroupeOut,
+    ExamenCreate,
+    ExamenOut,
     GroupeCreate,
     GroupeOut,
     GroupeUpdate,
+    NoteBatchCreate,
+    NoteCreate,
+    NoteOut,
+    NoteUpdate,
     PromotionCreate,
     PromotionOut,
     PromotionUpdate,
@@ -381,6 +387,119 @@ async def remove_etudiant_from_groupe(
         request,
         scolarite_url(f"etudiants/{etudiant_id}/groupes/{groupe_id}"),
     )
+
+
+@router.get(
+    "/notes",
+    include_in_schema=False,
+)
+@router.get(
+    "/notes/",
+    response_model=list[NoteOut],
+    openapi_extra=AUTH_OPENAPI_EXTRA,
+)
+async def list_notes(request: Request) -> Response:
+    return await proxy_request(request, scolarite_url("notes/"))
+
+
+@router.get(
+    "/examens",
+    include_in_schema=False,
+)
+@router.get(
+    "/examens/",
+    response_model=list[ExamenOut],
+    openapi_extra=AUTH_OPENAPI_EXTRA,
+)
+async def list_examens(request: Request) -> Response:
+    return await proxy_request(request, scolarite_url("examens/"))
+
+
+@router.post(
+    "/examens",
+    include_in_schema=False,
+)
+@router.post(
+    "/examens/",
+    response_model=ExamenOut,
+    status_code=status.HTTP_201_CREATED,
+    openapi_extra=AUTH_OPENAPI_EXTRA,
+)
+async def create_examen(request: Request, payload: ExamenCreate) -> Response:
+    _ = payload
+    return await proxy_request(request, scolarite_url("examens/"))
+
+
+@router.get(
+    "/examens/{examen_id}",
+    response_model=ExamenOut,
+    openapi_extra=AUTH_OPENAPI_EXTRA,
+    responses={status.HTTP_404_NOT_FOUND: {"model": ErrorResponse}},
+)
+async def get_examen(request: Request, examen_id: UUID) -> Response:
+    return await proxy_request(request, scolarite_url(f"examens/{examen_id}"))
+
+
+@router.post(
+    "/notes",
+    include_in_schema=False,
+)
+@router.post(
+    "/notes/",
+    response_model=NoteOut,
+    status_code=status.HTTP_201_CREATED,
+    openapi_extra=AUTH_OPENAPI_EXTRA,
+    responses={
+        status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
+        status.HTTP_409_CONFLICT: {"model": ErrorResponse},
+    },
+)
+async def create_note(request: Request, payload: NoteCreate) -> Response:
+    _ = payload
+    return await proxy_request(request, scolarite_url("notes/"))
+
+
+@router.post(
+    "/notes/batch",
+    response_model=list[NoteOut],
+    status_code=status.HTTP_201_CREATED,
+    openapi_extra=AUTH_OPENAPI_EXTRA,
+    responses={status.HTTP_409_CONFLICT: {"model": ErrorResponse}},
+)
+async def create_notes_batch(request: Request, payload: NoteBatchCreate) -> Response:
+    _ = payload
+    return await proxy_request(request, scolarite_url("notes/batch"))
+
+
+@router.get(
+    "/notes/{note_id}",
+    response_model=NoteOut,
+    openapi_extra=AUTH_OPENAPI_EXTRA,
+    responses={status.HTTP_404_NOT_FOUND: {"model": ErrorResponse}},
+)
+async def get_note(request: Request, note_id: UUID) -> Response:
+    return await proxy_request(request, scolarite_url(f"notes/{note_id}"))
+
+
+@router.patch(
+    "/notes/{note_id}",
+    response_model=NoteOut,
+    openapi_extra=AUTH_OPENAPI_EXTRA,
+    responses={status.HTTP_404_NOT_FOUND: {"model": ErrorResponse}},
+)
+async def update_note(request: Request, note_id: UUID, payload: NoteUpdate) -> Response:
+    _ = payload
+    return await proxy_request(request, scolarite_url(f"notes/{note_id}"))
+
+
+@router.delete(
+    "/notes/{note_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    openapi_extra=AUTH_OPENAPI_EXTRA,
+    responses={status.HTTP_404_NOT_FOUND: {"model": ErrorResponse}},
+)
+async def delete_note(request: Request, note_id: UUID) -> Response:
+    return await proxy_request(request, scolarite_url(f"notes/{note_id}"))
 
 
 @router.get(

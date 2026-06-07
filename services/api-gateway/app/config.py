@@ -7,6 +7,7 @@ class Settings(AppSettings):
     app_name: str = "api-gateway"
     identity_service_url: str = "http://identity-service:8000"
     scolarite_service_url: str = "http://scolarite-service:8000"
+    import_service_url: str = "http://import-service:8000"
 
 
 @lru_cache

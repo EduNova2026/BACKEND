@@ -198,5 +198,76 @@ def test_scolarite_routes_are_visible_in_gateway_openapi() -> None:
     assert "/api/v1/scolarite/promotions/{promotion_id}/etudiants/{etudiant_id}" in paths
     assert "/api/v1/scolarite/etudiants/search" in paths
     assert "/api/v1/scolarite/etudiants/resolve" in paths
+    assert "/api/v1/scolarite/examens/" in paths
+    assert "/api/v1/scolarite/examens/{examen_id}" in paths
+    assert "/api/v1/scolarite/notes/" in paths
+    assert "/api/v1/scolarite/notes/batch" in paths
+    assert "/api/v1/scolarite/notes/{note_id}" in paths
     assert "/api/v1/scolarite/roles/" in paths
     assert "/api/v1/scolarite/{path}" not in paths
+
+
+def test_scolarite_notes_batch_forwards_request_body(monkeypatch: MonkeyPatch) -> None:
+    _patch_scolarite_url(monkeypatch)
+    recorded_url = ""
+    recorded_content = b""
+
+    async def handler(
+        _method: str,
+        url: str,
+        content: bytes,
+        _headers: dict[str, str],
+        _params: object,
+    ) -> httpx.Response:
+        nonlocal recorded_url, recorded_content
+        recorded_url = url
+        recorded_content = content
+        return httpx.Response(201, json=[])
+
+    _patch_async_client(monkeypatch, handler)
+
+    response = client.post(
+        "/api/v1/scolarite/notes/batch",
+        json={
+            "examen_id": "00000000-0000-0000-0000-000000000001",
+            "notes": [
+                {
+                    "etudiant_id": "00000000-0000-0000-0000-000000000002",
+                    "valeur": 14.5,
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 201
+    assert recorded_url == "http://scolarite-service:8000/api/v1/notes/batch"
+    assert b'"examen_id":"00000000-0000-0000-0000-000000000001"' in recorded_content
+
+
+def test_scolarite_note_patch_forwards_to_note_id(monkeypatch: MonkeyPatch) -> None:
+    _patch_scolarite_url(monkeypatch)
+    recorded_method = ""
+    recorded_url = ""
+
+    async def handler(
+        method: str,
+        url: str,
+        _content: bytes,
+        _headers: dict[str, str],
+        _params: object,
+    ) -> httpx.Response:
+        nonlocal recorded_method, recorded_url
+        recorded_method = method
+        recorded_url = url
+        return httpx.Response(200, json={"id": "00000000-0000-0000-0000-000000000003"})
+
+    _patch_async_client(monkeypatch, handler)
+
+    response = client.patch(
+        "/api/v1/scolarite/notes/00000000-0000-0000-0000-000000000003",
+        json={"valeur": 16.0},
+    )
+
+    assert response.status_code == 200
+    assert recorded_method == "PATCH"
+    assert recorded_url == "http://scolarite-service:8000/api/v1/notes/00000000-0000-0000-0000-000000000003"
