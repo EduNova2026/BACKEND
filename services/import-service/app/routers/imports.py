@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,6 +24,7 @@ _MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 Mo
     summary="Importer un fichier CSV de notes Aurion",
 )
 async def upload_csv(
+    request: Request,
     file: UploadFile,
     enseignement_id: UUID,
     session: AsyncSession = Depends(get_session),
@@ -51,6 +52,7 @@ async def upload_csv(
         nom_fichier=file.filename,
         enseignement_id=enseignement_id,
         importe_par=importe_par,
+        authorization=request.headers.get("Authorization", ""),
         session=session,
         replica_session=replica_session,
     )

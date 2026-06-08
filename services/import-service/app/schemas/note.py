@@ -22,4 +22,3 @@ class NoteOut(BaseModel):
     valeur: float | None
     absent: bool
     motif_absence: str | None
-    appreciation: str | None

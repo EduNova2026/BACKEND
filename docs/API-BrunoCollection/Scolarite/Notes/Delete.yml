@@ -1,11 +1,11 @@
 info:
-  name: ME
+  name: Delete note
   type: http
-  seq: 3
+  seq: 6
 
 http:
-  method: GET
-  url: "{{host}}/api/v1/auth/me"
+  method: DELETE
+  url: "{{host}}/api/v1/scolarite/notes/{{note_id}}"
   headers:
     - name: Authorization
       value: Bearer {{token}}

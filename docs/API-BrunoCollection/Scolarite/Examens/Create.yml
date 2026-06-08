@@ -1,11 +1,11 @@
 info:
-  name: Create promotion
+  name: Create examen
   type: http
-  seq: 4
+  seq: 2
 
 http:
   method: POST
-  url: "{{host}}/api/v1/scolarite/promotions/"
+  url: "{{host}}/api/v1/scolarite/examens/"
   headers:
     - name: Authorization
       value: Bearer {{token}}
@@ -13,8 +13,11 @@ http:
     type: json
     data: |-
       {
-        "nom": "ISEN-CIR3",
-        "annee_scolaire": "2025-2026"
+        "enseignement_id": "{{enseignement_id}}",
+        "nom": "Contrôle continu 1",
+        "type": "examen",
+        "coefficient": 1,
+        "note_max": 20
       }
   auth: inherit
 

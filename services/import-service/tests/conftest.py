@@ -1,5 +1,9 @@
+import os
+
 import pytest
 from httpx import ASGITransport, AsyncClient
+
+os.environ.setdefault("JWT_SECRET", "test-secret")
 
 from app.main import app
 

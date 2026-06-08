@@ -19,7 +19,6 @@ class LigneCSV:
     prenom: str
     nom: str
     valeur: float | None
-    appreciation: str
     absent: bool
     motif_absence: str | None
 
@@ -76,7 +75,6 @@ def parse_aurion_csv(content: bytes) -> ResultatParsing:
                 prenom=row["Prénom.Apprenant"].strip(),
                 nom=row["Nom.Apprenant"].strip(),
                 valeur=valeur,
-                appreciation=row.get("Appréciation", "").strip(),
                 absent=absent,
                 motif_absence=row.get("Motif d absence", "").strip() or None,
             ))
