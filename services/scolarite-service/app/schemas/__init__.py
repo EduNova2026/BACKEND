@@ -21,6 +21,7 @@ from shared.schemas import (
     ResponsablePromotionOut,
     RoleAssignmentCreate,
     UserActivationUpdate,
+    UserOut,
     UtilisateurRoleOut,
 )
 
@@ -47,5 +48,6 @@ __all__ = [
     "ResponsablePromotionOut",
     "RoleAssignmentCreate",
     "UserActivationUpdate",
+    "UserOut",
     "UtilisateurRoleOut",
 ]
