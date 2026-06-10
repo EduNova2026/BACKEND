@@ -82,7 +82,7 @@ class EtudiantOut(BaseModel):
     id: UUID
     nom: str
     prenom: str
-    promotion_id: UUID
+    promotion_id: UUID | None
     utilisateur_id: UUID
 
 

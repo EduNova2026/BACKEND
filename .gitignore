@@ -181,6 +181,10 @@ pyrightconfig.json
 
 .python-version
 
-# ai
+# Local AI agent workspace and generated agent metadata
 .ai-agents/
+.claude/
 .omo/
+.gitnexus/
+AGENTS.md
+CLAUDE.md

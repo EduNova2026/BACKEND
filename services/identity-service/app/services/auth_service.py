@@ -162,10 +162,9 @@ async def login(
 
     if user.premier_login:
         user.premier_login = False
-
-    teacher_role = await ensure_role_exists(session, "enseignant")
-    if all(role.libelle != teacher_role.libelle for role in user.roles):
-        user.roles.append(teacher_role)
+        teacher_role = await ensure_role_exists(session, "enseignant")
+        if all(role.libelle != teacher_role.libelle for role in user.roles):
+            user.roles.append(teacher_role)
 
     await session.commit()
     await session.refresh(user)

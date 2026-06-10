@@ -30,6 +30,7 @@ from shared.schemas import (
     RoleAssignmentCreate,
     RoleOut,
     UserActivationUpdate,
+    UserOut,
     UtilisateurRoleOut,
 )
 
@@ -343,6 +344,16 @@ async def update_etudiant(
 )
 async def delete_etudiant(request: Request, etudiant_id: UUID) -> Response:
     return await proxy_request(request, scolarite_url(f"etudiants/{etudiant_id}"))
+
+
+@router.delete(
+    "/etudiants/{etudiant_id}/promotion",
+    status_code=status.HTTP_204_NO_CONTENT,
+    openapi_extra=AUTH_OPENAPI_EXTRA,
+    responses={status.HTTP_404_NOT_FOUND: {"model": ErrorResponse}},
+)
+async def remove_etudiant_from_promotion(request: Request, etudiant_id: UUID) -> Response:
+    return await proxy_request(request, scolarite_url(f"etudiants/{etudiant_id}/promotion"))
 
 
 @router.get(
@@ -670,6 +681,29 @@ async def remove_responsable_from_promotion(
 )
 async def list_responsable_promotions(request: Request, responsable_id: UUID) -> Response:
     return await proxy_request(request, scolarite_url(f"responsables/{responsable_id}/promotions"))
+
+
+@router.get(
+    "/utilisateurs",
+    include_in_schema=False,
+)
+@router.get(
+    "/utilisateurs/",
+    response_model=list[UserOut],
+    openapi_extra=AUTH_OPENAPI_EXTRA,
+)
+async def list_utilisateurs(request: Request) -> Response:
+    return await proxy_request(request, scolarite_url("utilisateurs/"))
+
+
+@router.get(
+    "/utilisateurs/{utilisateur_id}",
+    response_model=UserOut,
+    openapi_extra=AUTH_OPENAPI_EXTRA,
+    responses={status.HTTP_404_NOT_FOUND: {"model": ErrorResponse}},
+)
+async def get_utilisateur(request: Request, utilisateur_id: UUID) -> Response:
+    return await proxy_request(request, scolarite_url(f"utilisateurs/{utilisateur_id}"))
 
 
 @router.patch(
