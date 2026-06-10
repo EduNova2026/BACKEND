@@ -205,7 +205,12 @@ async def update_etudiant(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Insufficient permissions",
             )
-        await ensure_promotion_reassignment_allowed(session, etudiant, update_data["promotion_id"])
+        if update_data["promotion_id"] is None:
+            await session.execute(
+                delete(etudiant_groupes).where(etudiant_groupes.c.etudiant_id == etudiant_id)
+            )
+        else:
+            await ensure_promotion_reassignment_allowed(session, etudiant, update_data["promotion_id"])
 
     for field, value in update_data.items():
         if field in {"nom", "prenom"}:
@@ -237,6 +242,27 @@ async def delete_etudiant(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Etudiant not found")
 
     await session.delete(etudiant)
+    await session.commit()
+
+
+@router.delete(
+    "/{etudiant_id}/promotion",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={status.HTTP_404_NOT_FOUND: {"model": ErrorResponse}},
+)
+async def remove_etudiant_from_promotion(
+    etudiant_id: UUID,
+    _: CurrentUser = Depends(require_responsable_pedagogique),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    etudiant = await session.get(Etudiant, etudiant_id)
+    if etudiant is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Etudiant not found")
+
+    await session.execute(
+        delete(etudiant_groupes).where(etudiant_groupes.c.etudiant_id == etudiant_id)
+    )
+    etudiant.promotion_id = None
     await session.commit()
 
 

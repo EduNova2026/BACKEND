@@ -1,0 +1,18 @@
+info:
+  name: Unenroll student from promotion
+  type: http
+  seq: 8
+
+http:
+  method: DELETE
+  url: "{{host}}/api/v1/scolarite/etudiants/{{etudiant_id}}/promotion"
+  headers:
+    - name: Authorization
+      value: Bearer {{token}}
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
