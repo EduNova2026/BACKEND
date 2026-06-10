@@ -154,6 +154,74 @@ def test_scolarite_resolve_forwards_query_params(monkeypatch: MonkeyPatch) -> No
     )
 
 
+def test_scolarite_utilisateurs_list_forwards_query_params(monkeypatch: MonkeyPatch) -> None:
+    _patch_scolarite_url(monkeypatch)
+    recorded_url = ""
+    recorded_params: object = None
+
+    async def handler(
+        _method: str,
+        url: str,
+        _content: bytes,
+        _headers: dict[str, str],
+        params: object,
+    ) -> httpx.Response:
+        nonlocal recorded_url, recorded_params
+        recorded_url = url
+        recorded_params = params
+        return httpx.Response(200, json=[])
+
+    _patch_async_client(monkeypatch, handler)
+
+    response = client.get(
+        "/api/v1/scolarite/utilisateurs",
+        params={"search": "alice", "role": "responsable_pedagogique", "actif": "true"},
+    )
+
+    assert response.status_code == 200
+    assert recorded_url == "http://scolarite-service:8000/api/v1/utilisateurs/"
+    assert str(recorded_params) == "search=alice&role=responsable_pedagogique&actif=true"
+
+
+def test_scolarite_utilisateur_detail_forwards_to_utilisateur_id(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    _patch_scolarite_url(monkeypatch)
+    recorded_url = ""
+
+    async def handler(
+        _method: str,
+        url: str,
+        _content: bytes,
+        _headers: dict[str, str],
+        _params: object,
+    ) -> httpx.Response:
+        nonlocal recorded_url
+        recorded_url = url
+        return httpx.Response(
+            200,
+            json={
+                "id": "00000000-0000-0000-0000-000000000001",
+                "email": "alice@example.com",
+                "nom": "Durand",
+                "prenom": "Alice",
+                "roles": [],
+                "actif": True,
+                "premier_login": False,
+            },
+        )
+
+    _patch_async_client(monkeypatch, handler)
+
+    response = client.get("/api/v1/scolarite/utilisateurs/00000000-0000-0000-0000-000000000001")
+
+    assert response.status_code == 200
+    assert recorded_url == (
+        "http://scolarite-service:8000/api/v1/utilisateurs/"
+        "00000000-0000-0000-0000-000000000001"
+    )
+
+
 def test_scolarite_promotion_enroll_forwards_to_prefixed_upstream(
     monkeypatch: MonkeyPatch,
 ) -> None:
@@ -204,6 +272,8 @@ def test_scolarite_routes_are_visible_in_gateway_openapi() -> None:
     assert "/api/v1/scolarite/notes/batch" in paths
     assert "/api/v1/scolarite/notes/{note_id}" in paths
     assert "/api/v1/scolarite/roles/" in paths
+    assert "/api/v1/scolarite/utilisateurs/" in paths
+    assert "/api/v1/scolarite/utilisateurs/{utilisateur_id}" in paths
     assert "/api/v1/scolarite/{path}" not in paths
 
 
