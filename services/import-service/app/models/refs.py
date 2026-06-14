@@ -9,22 +9,13 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.database import RefBase
 
 
-class UtilisateurRef(RefBase):
-    """Table utilisateurs — possédée par identity-service. READ-ONLY ici."""
-    __tablename__ = "utilisateurs"
+class EtudiantRef(RefBase):
+    """Table etudiants — possédée par scolarite-service. READ-ONLY ici."""
+    __tablename__ = "etudiants"
 
     id: Mapped[UUID] = mapped_column(PgUUID(as_uuid=True), primary_key=True)
     nom: Mapped[str] = mapped_column(String(100), nullable=False)
     prenom: Mapped[str] = mapped_column(String(100), nullable=False)
-    email: Mapped[str] = mapped_column(String(255), nullable=False)
-
-
-class EtudiantRef(RefBase):
-    """Table etudiants — possédée par user-service. READ-ONLY ici."""
-    __tablename__ = "etudiants"
-
-    id: Mapped[UUID] = mapped_column(PgUUID(as_uuid=True), primary_key=True)
-    utilisateur_id: Mapped[UUID] = mapped_column(PgUUID(as_uuid=True), nullable=False)
     promotion_id: Mapped[UUID] = mapped_column(PgUUID(as_uuid=True), nullable=False)
 
 

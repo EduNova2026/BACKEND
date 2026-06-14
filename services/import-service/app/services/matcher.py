@@ -1,11 +1,25 @@
 from __future__ import annotations
 
+import re
+import unicodedata
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.refs import EtudiantRef, UtilisateurRef
+from app.models.refs import EtudiantRef
+
+
+# Même logique de normalisation que scolarite-service (routers/etudiants.py::normalize_name)
+# Les noms sont stockés en minuscules sans accents dans la table etudiants.
+# On applique la même transformation sur les noms venant du CSV avant de chercher en base.
+def _normalize(value: str) -> str:
+    without_accents = "".join(
+        char
+        for char in unicodedata.normalize("NFKD", value.strip().casefold())
+        if not unicodedata.combining(char)
+    )
+    return re.sub(r"[\s\-']+", " ", without_accents).strip()
 
 
 async def find_etudiant_by_nom_prenom(
@@ -13,16 +27,10 @@ async def find_etudiant_by_nom_prenom(
     nom: str,
     prenom: str,
 ) -> UUID | None:
-    """Cherche un étudiant par nom + prénom (insensible à la casse).
-
-    Retourne l'etudiant.id si trouvé, None sinon.
-    """
     result = await session.execute(
-        select(EtudiantRef)
-        .join(UtilisateurRef, UtilisateurRef.id == EtudiantRef.utilisateur_id)
-        .where(
-            func.upper(UtilisateurRef.nom) == nom.strip().upper(),
-            func.upper(UtilisateurRef.prenom) == prenom.strip().upper(),
+        select(EtudiantRef).where(
+            EtudiantRef.nom == _normalize(nom),
+            EtudiantRef.prenom == _normalize(prenom),
         )
     )
     etudiant = result.scalar_one_or_none()
