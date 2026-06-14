@@ -214,6 +214,24 @@ async def test_remove_etudiant_from_groupe(async_client: AsyncClient) -> None:
     assert resp.status_code == 204
 
 
+async def test_remove_etudiant_from_promotion_clears_groupes(async_client: AsyncClient) -> None:
+    promotion_id = await _create_promotion(async_client, nom="ING-E14B")
+    groupe_id = await _create_groupe(async_client, promotion_id, nom="GE3B")
+    etudiant_id = (await _create_etudiant(async_client, promotion_id))["id"]
+    assign_resp = await async_client.post(f"/api/v1/etudiants/{etudiant_id}/groupes/{groupe_id}")
+    assert assign_resp.status_code == 201
+
+    resp = await async_client.delete(f"/api/v1/etudiants/{etudiant_id}/promotion")
+
+    assert resp.status_code == 204
+    get_resp = await async_client.get(f"/api/v1/etudiants/{etudiant_id}")
+    assert get_resp.status_code == 200
+    assert get_resp.json()["promotion_id"] is None
+    groupes_resp = await async_client.get(f"/api/v1/etudiants/{etudiant_id}/groupes")
+    assert groupes_resp.status_code == 200
+    assert groupes_resp.json() == []
+
+
 async def test_duplicate_groupe_assignment_returns_expected_status(
     async_client: AsyncClient,
 ) -> None:

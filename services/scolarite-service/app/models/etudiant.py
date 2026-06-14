@@ -24,8 +24,8 @@ class Etudiant(Base):
     utilisateur_id: Mapped[UUID] = mapped_column(
         PgUUID(as_uuid=True), nullable=False, default=uuid4, unique=True, index=True
     )
-    promotion_id: Mapped[UUID] = mapped_column(
-        PgUUID(as_uuid=True), ForeignKey("promotions.id"), nullable=False
+    promotion_id: Mapped[UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("promotions.id"), nullable=True
     )
 
     __table_args__ = (
@@ -34,7 +34,7 @@ class Etudiant(Base):
         Index("ix_etudiants_nom_prenom", "nom", "prenom"),
     )
 
-    promotion: Mapped["Promotion"] = relationship(back_populates="etudiants")
+    promotion: Mapped["Promotion | None"] = relationship(back_populates="etudiants")
     groupes: Mapped[list["Groupe"]] = relationship(
         secondary="etudiant_groupes",
         back_populates="etudiants",
