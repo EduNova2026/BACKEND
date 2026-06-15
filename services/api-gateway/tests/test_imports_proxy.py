@@ -110,14 +110,14 @@ def test_import_upload_forwards_query_and_multipart_body(monkeypatch: MonkeyPatc
 
     response = client.post(
         "/api/v1/imports/upload",
-        params={"enseignement_id": "00000000-0000-0000-0000-000000000002"},
+        params={"examen_id": "00000000-0000-0000-0000-000000000002"},
         headers={"Authorization": "Bearer upload-token"},
         files={"file": ("notes.csv", b"Nom;Note\nAMARI;12\n", "text/csv")},
     )
 
     assert response.status_code == 201
     assert recorded_url == "http://import-service:8000/api/v1/imports/upload"
-    assert str(recorded_params) == "enseignement_id=00000000-0000-0000-0000-000000000002"
+    assert str(recorded_params) == "examen_id=00000000-0000-0000-0000-000000000002"
     assert recorded_headers["authorization"] == "Bearer upload-token"
     assert recorded_headers["content-type"].startswith("multipart/form-data")
     assert b"notes.csv" in recorded_content
