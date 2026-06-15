@@ -26,7 +26,8 @@ _MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 Mo
 async def upload_csv(
     request: Request,
     file: UploadFile,
-    enseignement_id: UUID,
+    enseignement_id: UUID | None = None,
+    examen_id: UUID | None = None,
     session: AsyncSession = Depends(get_session),
     replica_session: AsyncSession = Depends(get_replica_session),
     current_user: dict[str, object] = Depends(
@@ -46,11 +47,18 @@ async def upload_csv(
             detail="Fichier trop volumineux (max 5 Mo)",
         )
 
+    if enseignement_id is None and examen_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing examen_id or enseignement_id",
+        )
+
     importe_par = UUID(str(current_user["id"]))
     job = await run_import(
         content=content,
         nom_fichier=file.filename,
         enseignement_id=enseignement_id,
+        examen_id=examen_id,
         importe_par=importe_par,
         authorization=request.headers.get("Authorization", ""),
         session=session,

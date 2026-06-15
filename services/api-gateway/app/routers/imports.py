@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Request, Response, status
+from fastapi import APIRouter, HTTPException, Request, Response, status
 
 from app.config import get_settings
 from app.services.http_client import proxy_request
@@ -55,6 +55,14 @@ async def get_import_job(request: Request, job_id: UUID) -> Response:
         status.HTTP_422_UNPROCESSABLE_CONTENT: {"model": ErrorResponse},
     },
 )
-async def upload_import_csv(request: Request, enseignement_id: UUID) -> Response:
-    _ = enseignement_id
+async def upload_import_csv(
+    request: Request,
+    enseignement_id: UUID | None = None,
+    examen_id: UUID | None = None,
+) -> Response:
+    if enseignement_id is None and examen_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing examen_id or enseignement_id",
+        )
     return await proxy_request(request, import_url("imports/upload"))

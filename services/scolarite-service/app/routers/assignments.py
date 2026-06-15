@@ -146,7 +146,7 @@ async def assign_responsable_to_promotion(
     promotion = await session.get(Promotion, promotion_id)
     if promotion is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Promotion not found")
-    await get_active_user_with_role_or_400(session, responsable_id, RESPONSABLE_PEDAGOGIQUE, ADMIN_PEDAGOGIQUE)
+    await get_active_user_with_role_or_400(session, responsable_id, RESPONSABLE_PEDAGOGIQUE)
 
     assignment = await session.get(
         ResponsablePromotion,

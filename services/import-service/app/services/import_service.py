@@ -43,7 +43,8 @@ async def create_notes_in_scolarite(payload: dict[str, object], authorization: s
 async def run_import(
     content: bytes,
     nom_fichier: str,
-    enseignement_id: UUID,
+    enseignement_id: UUID | None,
+    examen_id: str | None,
     importe_par: UUID,
     authorization: str,
     session: AsyncSession,
@@ -58,12 +59,13 @@ async def run_import(
     session.add(job)
     await session.flush()
 
-    enseignement = await replica_session.get(EnseignementRef, enseignement_id)
-    if enseignement is None:
-        job.statut = "erreur"
-        job.erreurs_detail = [{"raison": "enseignement_id introuvable en base"}]
-        await session.commit()
-        return job
+    if examen_id is None:
+        enseignement = await replica_session.get(EnseignementRef, enseignement_id)
+        if enseignement is None:
+            job.statut = "erreur"
+            job.erreurs_detail = [{"raison": "enseignement_id introuvable en base"}]
+            await session.commit()
+            return job
 
     resultat = parse_aurion_csv(content)
 
@@ -119,17 +121,18 @@ async def run_import(
 
     if notes_payload:
         try:
-            examen_id = await create_examen_in_scolarite(
-                {
-                    "enseignement_id": str(enseignement_id),
-                    "nom": resultat.examen.libelle,
-                    "type": "examen",
-                    "coefficient": 1.0,
-                    "note_max": 20.0,
-                    "code_aurion": resultat.examen.code,
-                },
-                authorization,
-            )
+            if examen_id is None:
+                examen_id = await create_examen_in_scolarite(
+                    {
+                        "enseignement_id": str(enseignement_id),
+                        "nom": resultat.examen.libelle,
+                        "type": "examen",
+                        "coefficient": 1.0,
+                        "note_max": 20.0,
+                        "code_aurion": resultat.examen.code,
+                    },
+                    authorization,
+                )
             await create_notes_in_scolarite(
                 {
                     "examen_id": examen_id,

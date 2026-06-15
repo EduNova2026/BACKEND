@@ -109,6 +109,28 @@ async def test_rp_can_assign_teacher_to_group(
     assert response.json()["groupe_id"] == groupe_id
 
 
+async def test_admin_pedagogique_can_assign_teacher_to_group(
+    async_client: AsyncClient,
+    db_session: AsyncSession,
+    auth_headers_factory: Callable[..., dict[str, str]],
+) -> None:
+    admin_id = str(uuid4())
+    await _seed_utilisateur(db_session, admin_id, "admin@example.com")
+    await _seed_role_assignment(db_session, admin_id, "admin_pedagogique")
+    teacher_id = await _seed_teacher(db_session)
+    promotion_id = await _create_promotion(async_client, "AUTH-ADMIN-A")
+    groupe_id = await _create_groupe(async_client, promotion_id, "AUTH-ADMIN-G1")
+
+    response = await async_client.post(
+        f"/api/v1/groupes/{groupe_id}/enseignants/{teacher_id}",
+        headers=auth_headers_factory(user_id=admin_id, roles=["admin_pedagogique"]),
+    )
+
+    assert response.status_code == 201
+    assert response.json()["enseignant_id"] == teacher_id
+    assert response.json()["groupe_id"] == groupe_id
+
+
 async def test_non_rp_cannot_assign_teacher_to_group(
     async_client: AsyncClient,
     db_session: AsyncSession,
@@ -194,6 +216,53 @@ async def test_teacher_cannot_assign_student_to_group(
     )
 
     assert response.status_code == 403
+
+
+async def test_admin_pedagogique_can_assign_promotion_to_responsable(
+    async_client: AsyncClient,
+    db_session: AsyncSession,
+    auth_headers_factory: Callable[..., dict[str, str]],
+) -> None:
+    admin_id = str(uuid4())
+    responsable_id = str(uuid4())
+    await _seed_utilisateur(db_session, admin_id, "admin@example.com")
+    await _seed_utilisateur(db_session, responsable_id, "responsable@example.com")
+    await _seed_role_assignment(db_session, admin_id, "admin_pedagogique")
+    await _seed_role_assignment(db_session, responsable_id, "responsable_pedagogique")
+
+    promotion_id = await _create_promotion(async_client, "AUTH-PROMO")
+
+    response = await async_client.post(
+        f"/api/v1/promotions/{promotion_id}/responsables/{responsable_id}",
+        headers=auth_headers_factory(user_id=admin_id, roles=["admin_pedagogique"]),
+    )
+
+    assert response.status_code == 201
+    assert response.json()["responsable_id"] == responsable_id
+    assert response.json()["promotion_id"] == promotion_id
+
+
+async def test_admin_pedagogique_cannot_assign_promotion_to_admin(
+    async_client: AsyncClient,
+    db_session: AsyncSession,
+    auth_headers_factory: Callable[..., dict[str, str]],
+) -> None:
+    admin_id = str(uuid4())
+    target_id = str(uuid4())
+    await _seed_utilisateur(db_session, admin_id, "admin@example.com")
+    await _seed_utilisateur(db_session, target_id, "target@example.com")
+    await _seed_role_assignment(db_session, admin_id, "admin_pedagogique")
+    await _seed_role_assignment(db_session, target_id, "admin_pedagogique")
+
+    promotion_id = await _create_promotion(async_client, "AUTH-PROMO2")
+
+    response = await async_client.post(
+        f"/api/v1/promotions/{promotion_id}/responsables/{target_id}",
+        headers=auth_headers_factory(user_id=admin_id, roles=["admin_pedagogique"]),
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Utilisateur does not have any of the required roles: responsable_pedagogique"
 
 
 async def test_non_rp_cannot_assign_or_remove_roles(
