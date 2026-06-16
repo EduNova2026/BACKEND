@@ -14,7 +14,9 @@ http:
     data: |-
       {
         "nom": "TransformationIntegrales",
-        "promotion_id": "{{promotion_id}}"
+        "promotion_id": "{{promotion_id}}",
+        "semestre": 1,
+        "coefficient": 1.0
       }
   auth: inherit
 
