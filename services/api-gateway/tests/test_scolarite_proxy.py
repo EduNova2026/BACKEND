@@ -257,6 +257,177 @@ def test_scolarite_promotion_enroll_forwards_to_prefixed_upstream(
     )
 
 
+def test_scolarite_etudiant_moyenne_forwards_query_params(monkeypatch: MonkeyPatch) -> None:
+    _patch_scolarite_url(monkeypatch)
+    recorded_url = ""
+    recorded_semestre = ""
+
+    async def handler(
+        _method: str,
+        url: str,
+        _content: bytes,
+        _headers: dict[str, str],
+        params: object,
+    ) -> httpx.Response:
+        nonlocal recorded_url, recorded_semestre
+        recorded_url = url
+        if hasattr(params, "get"):
+            recorded_semestre = str(params.get("semestre"))
+        return httpx.Response(200, json={"moyenne": 14.5})
+
+    _patch_async_client(monkeypatch, handler)
+
+    response = client.get(
+        "/api/v1/scolarite/etudiants/00000000-0000-0000-0000-000000000001/moyenne",
+        params={"semestre": "1"},
+    )
+
+    assert response.status_code == 200
+    assert recorded_url == (
+        "http://scolarite-service:8000/api/v1/etudiants/"
+        "00000000-0000-0000-0000-000000000001/moyenne"
+    )
+    assert recorded_semestre == "1"
+
+
+def test_scolarite_promotion_moyenne_forwards_query_params(monkeypatch: MonkeyPatch) -> None:
+    _patch_scolarite_url(monkeypatch)
+    recorded_url = ""
+    recorded_semestre = ""
+
+    async def handler(
+        _method: str,
+        url: str,
+        _content: bytes,
+        _headers: dict[str, str],
+        params: object,
+    ) -> httpx.Response:
+        nonlocal recorded_url, recorded_semestre
+        recorded_url = url
+        if hasattr(params, "get"):
+            recorded_semestre = str(params.get("semestre"))
+        return httpx.Response(200, json={"moyenne": 13.25})
+
+    _patch_async_client(monkeypatch, handler)
+
+    response = client.get(
+        "/api/v1/scolarite/promotions/00000000-0000-0000-0000-000000000001/moyenne",
+        params={"semestre": "1"},
+    )
+
+    assert response.status_code == 200
+    assert recorded_url == (
+        "http://scolarite-service:8000/api/v1/promotions/"
+        "00000000-0000-0000-0000-000000000001/moyenne"
+    )
+    assert recorded_semestre == "1"
+
+
+def test_scolarite_enseignement_moyenne_forwards_query_params(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    _patch_scolarite_url(monkeypatch)
+    recorded_url = ""
+    recorded_semestre = ""
+
+    async def handler(
+        _method: str,
+        url: str,
+        _content: bytes,
+        _headers: dict[str, str],
+        params: object,
+    ) -> httpx.Response:
+        nonlocal recorded_url, recorded_semestre
+        recorded_url = url
+        if hasattr(params, "get"):
+            recorded_semestre = str(params.get("semestre"))
+        return httpx.Response(200, json={"moyenne": 12.75})
+
+    _patch_async_client(monkeypatch, handler)
+
+    response = client.get(
+        "/api/v1/scolarite/enseignements/00000000-0000-0000-0000-000000000001/moyenne",
+        params={"semestre": "1"},
+    )
+
+    assert response.status_code == 200
+    assert recorded_url == (
+        "http://scolarite-service:8000/api/v1/enseignements/"
+        "00000000-0000-0000-0000-000000000001/moyenne"
+    )
+    assert recorded_semestre == "1"
+
+
+def test_scolarite_promotion_etudiants_moyennes_forwards_query_params(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    _patch_scolarite_url(monkeypatch)
+    recorded_url = ""
+    recorded_semestre = ""
+
+    async def handler(
+        _method: str,
+        url: str,
+        _content: bytes,
+        _headers: dict[str, str],
+        params: object,
+    ) -> httpx.Response:
+        nonlocal recorded_url, recorded_semestre
+        recorded_url = url
+        if hasattr(params, "get"):
+            recorded_semestre = str(params.get("semestre"))
+        return httpx.Response(200, json=[])
+
+    _patch_async_client(monkeypatch, handler)
+
+    response = client.get(
+        "/api/v1/scolarite/promotions/00000000-0000-0000-0000-000000000001/etudiants/moyennes",
+        params={"semestre": "1"},
+    )
+
+    assert response.status_code == 200
+    assert recorded_url == (
+        "http://scolarite-service:8000/api/v1/promotions/"
+        "00000000-0000-0000-0000-000000000001/etudiants/moyennes"
+    )
+    assert recorded_semestre == "1"
+
+
+def test_scolarite_groupe_etudiants_moyennes_forwards_query_params(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    _patch_scolarite_url(monkeypatch)
+    recorded_url = ""
+    recorded_semestre = ""
+
+    async def handler(
+        _method: str,
+        url: str,
+        _content: bytes,
+        _headers: dict[str, str],
+        params: object,
+    ) -> httpx.Response:
+        nonlocal recorded_url, recorded_semestre
+        recorded_url = url
+        if hasattr(params, "get"):
+            recorded_semestre = str(params.get("semestre"))
+        return httpx.Response(200, json=[])
+
+    _patch_async_client(monkeypatch, handler)
+
+    response = client.get(
+        "/api/v1/scolarite/groupes/00000000-0000-0000-0000-000000000001/etudiants/moyennes",
+        params={"semestre": "2"},
+    )
+
+    assert response.status_code == 200
+    assert recorded_url == (
+        "http://scolarite-service:8000/api/v1/groupes/"
+        "00000000-0000-0000-0000-000000000001/etudiants/moyennes"
+    )
+    assert recorded_semestre == "2"
+
+
 def test_scolarite_routes_are_visible_in_gateway_openapi() -> None:
     paths = app.openapi()["paths"]
 
@@ -264,6 +435,11 @@ def test_scolarite_routes_are_visible_in_gateway_openapi() -> None:
     assert "/api/v1/scolarite/groupes/" in paths
     assert "/api/v1/scolarite/etudiants/" in paths
     assert "/api/v1/scolarite/promotions/{promotion_id}/etudiants/{etudiant_id}" in paths
+    assert "/api/v1/scolarite/etudiants/{etudiant_id}/moyenne" in paths
+    assert "/api/v1/scolarite/promotions/{promotion_id}/moyenne" in paths
+    assert "/api/v1/scolarite/promotions/{promotion_id}/etudiants/moyennes" in paths
+    assert "/api/v1/scolarite/groupes/{groupe_id}/etudiants/moyennes" in paths
+    assert "/api/v1/scolarite/enseignements/{enseignement_id}/moyenne" in paths
     assert "/api/v1/scolarite/etudiants/search" in paths
     assert "/api/v1/scolarite/etudiants/resolve" in paths
     assert "/api/v1/scolarite/examens/" in paths
