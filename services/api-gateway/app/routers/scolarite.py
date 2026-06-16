@@ -19,6 +19,8 @@ from shared.schemas import (
     GroupeCreate,
     GroupeOut,
     GroupeUpdate,
+    MoyenneParEtudiant,
+    MoyenneOut,
     NoteBatchCreate,
     NoteCreate,
     NoteOut,
@@ -721,6 +723,86 @@ async def update_utilisateur_activation(
     return await proxy_request(
         request,
         scolarite_url(f"utilisateurs/{utilisateur_id}/activation"),
+    )
+
+
+@router.get(
+    "/etudiants/{etudiant_id}/moyenne",
+    response_model=MoyenneOut,
+    openapi_extra=AUTH_OPENAPI_EXTRA,
+    responses={status.HTTP_404_NOT_FOUND: {"model": ErrorResponse}},
+)
+async def get_etudiant_moyenne(
+    request: Request,
+    etudiant_id: UUID,
+) -> Response:
+    return await proxy_request(
+        request,
+        scolarite_url(f"etudiants/{etudiant_id}/moyenne"),
+    )
+
+
+@router.get(
+    "/promotions/{promotion_id}/moyenne",
+    response_model=MoyenneOut,
+    openapi_extra=AUTH_OPENAPI_EXTRA,
+    responses={status.HTTP_404_NOT_FOUND: {"model": ErrorResponse}},
+)
+async def get_promotion_moyenne(
+    request: Request,
+    promotion_id: UUID,
+) -> Response:
+    return await proxy_request(
+        request,
+        scolarite_url(f"promotions/{promotion_id}/moyenne"),
+    )
+
+
+@router.get(
+    "/enseignements/{enseignement_id}/moyenne",
+    response_model=MoyenneOut,
+    openapi_extra=AUTH_OPENAPI_EXTRA,
+    responses={status.HTTP_404_NOT_FOUND: {"model": ErrorResponse}},
+)
+async def get_enseignement_moyenne(
+    request: Request,
+    enseignement_id: UUID,
+) -> Response:
+    return await proxy_request(
+        request,
+        scolarite_url(f"enseignements/{enseignement_id}/moyenne"),
+    )
+
+
+@router.get(
+    "/promotions/{promotion_id}/etudiants/moyennes",
+    response_model=list[MoyenneParEtudiant],
+    openapi_extra=AUTH_OPENAPI_EXTRA,
+    responses={status.HTTP_404_NOT_FOUND: {"model": ErrorResponse}},
+)
+async def get_promotion_etudiants_moyennes(
+    request: Request,
+    promotion_id: UUID,
+) -> Response:
+    return await proxy_request(
+        request,
+        scolarite_url(f"promotions/{promotion_id}/etudiants/moyennes"),
+    )
+
+
+@router.get(
+    "/groupes/{groupe_id}/etudiants/moyennes",
+    response_model=list[MoyenneParEtudiant],
+    openapi_extra=AUTH_OPENAPI_EXTRA,
+    responses={status.HTTP_404_NOT_FOUND: {"model": ErrorResponse}},
+)
+async def get_groupe_etudiants_moyennes(
+    request: Request,
+    groupe_id: UUID,
+) -> Response:
+    return await proxy_request(
+        request,
+        scolarite_url(f"groupes/{groupe_id}/etudiants/moyennes"),
     )
 
 

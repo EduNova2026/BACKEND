@@ -15,6 +15,7 @@ from app.routers import (
     promotions_router,
     groupes_router,
     etudiants_router,
+    moyennes_router,
     roles_router,
     notes_router,
     utilisateurs_router,
@@ -66,6 +67,7 @@ def create_app() -> FastAPI:
     app.include_router(promotions_router, prefix=settings.api_prefix)
     app.include_router(groupes_router, prefix=settings.api_prefix)
     app.include_router(etudiants_router, prefix=settings.api_prefix)
+    app.include_router(moyennes_router, prefix=settings.api_prefix)
     app.include_router(roles_router, prefix=settings.api_prefix)
     app.include_router(notes_router, prefix=settings.api_prefix)
     app.include_router(assignments_router, prefix=settings.api_prefix)

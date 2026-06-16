@@ -62,7 +62,7 @@ async def create_groupe(
     if promotion is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Promotion not found")
 
-    groupe = Groupe(nom=payload.nom, promotion_id=payload.promotion_id)
+    groupe = Groupe(nom=payload.nom, promotion_id=payload.promotion_id, semestre=payload.semestre, coefficient=payload.coefficient)
     session.add(groupe)
     await session.commit()
     await session.refresh(groupe)

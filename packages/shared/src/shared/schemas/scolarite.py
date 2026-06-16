@@ -4,7 +4,7 @@ from datetime import date, datetime
 from typing import ClassVar
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # --- Promotion ---
@@ -40,6 +40,8 @@ class GroupeCreate(BaseModel):
 
     nom: str
     promotion_id: UUID
+    semestre: int = Field(default=1, ge=1, le=2)
+    coefficient: float = Field(default=1.0, gt=0)
 
 
 class GroupeUpdate(BaseModel):
@@ -47,6 +49,8 @@ class GroupeUpdate(BaseModel):
 
     nom: str | None = None
     promotion_id: UUID | None = None
+    semestre: int | None = Field(default=None, ge=1, le=2)
+    coefficient: float | None = Field(default=None, gt=0)
 
 
 class GroupeOut(BaseModel):
@@ -55,6 +59,8 @@ class GroupeOut(BaseModel):
     id: UUID
     nom: str
     promotion_id: UUID
+    semestre: int = 1
+    coefficient: float = 1.0
 
 
 # --- Etudiant ---
@@ -209,3 +215,25 @@ class UtilisateurRoleOut(BaseModel):
     utilisateur_id: UUID
     role_id: UUID
     libelle: str | None = None
+
+
+# --- Moyenne ---
+
+
+class MoyenneOut(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
+
+    moyenne: float | None = None
+    semestre: int
+    note_count: int
+    coefficient_total: float
+
+
+class MoyenneParEtudiant(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
+
+    etudiant_id: UUID
+    moyenne: float | None = None
+    semestre: int
+    note_count: int
+    coefficient_total: float

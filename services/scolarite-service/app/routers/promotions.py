@@ -11,8 +11,14 @@ from shared.schemas import ErrorResponse
 from app.cache import cache_delete_pattern, cache_get_json, cache_set_json
 from app.config import settings
 from app.database import get_replica_session, get_session
-from app.dependencies.auth import CurrentUser, require_responsable_pedagogique
-from app.models import Promotion
+from app.dependencies.auth import (
+    CurrentUser,
+    ENSEIGNANT,
+    get_current_user,
+    is_responsable_pedagogique,
+    require_responsable_pedagogique,
+)
+from app.models import EnseignantGroupe, Groupe, Promotion
 from app.schemas import EtudiantOut, GroupeOut, PromotionCreate, PromotionOut, PromotionUpdate
 from app.services.promotion_membership import (
     ensure_promotion_reassignment_allowed,
@@ -30,21 +36,40 @@ router = APIRouter(prefix="/promotions", tags=["promotions"])
 async def list_promotions(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
-    _: CurrentUser = Depends(require_responsable_pedagogique),
+    current_user: CurrentUser = Depends(get_current_user),
     replica_session: AsyncSession = Depends(get_replica_session),
 ) -> list[PromotionOut]:
-    cache_key = f"scolarite:promotions:list:{skip}:{limit}"
-    cached = await cache_get_json(cache_key)
-    if cached is not None:
-        return [PromotionOut.model_validate(item) for item in cached]
+    if is_responsable_pedagogique(current_user):
+        cache_key = f"scolarite:promotions:list:{skip}:{limit}"
+        cached = await cache_get_json(cache_key)
+        if cached is not None:
+            return [PromotionOut.model_validate(item) for item in cached]
 
-    result = await replica_session.scalars(
-        select(Promotion).order_by(Promotion.nom).offset(skip).limit(limit)
+        result = await replica_session.scalars(
+            select(Promotion).order_by(Promotion.nom).offset(skip).limit(limit)
+        )
+        promotions = result.all()
+        response = [PromotionOut.model_validate(promotion) for promotion in promotions]
+        await cache_set_json(cache_key, response, settings.cache_reference_ttl_seconds)
+        return response
+
+    if current_user.has_role(ENSEIGNANT):
+        result = await replica_session.scalars(
+            select(Promotion)
+            .join(Groupe, Groupe.promotion_id == Promotion.id)
+            .join(EnseignantGroupe, EnseignantGroupe.groupe_id == Groupe.id)
+            .where(EnseignantGroupe.enseignant_id == current_user.id)
+            .distinct()
+            .order_by(Promotion.nom)
+            .offset(skip)
+            .limit(limit)
+        )
+        return [PromotionOut.model_validate(promotion) for promotion in result.all()]
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Insufficient permissions",
     )
-    promotions = result.all()
-    response = [PromotionOut.model_validate(promotion) for promotion in promotions]
-    await cache_set_json(cache_key, response, settings.cache_reference_ttl_seconds)
-    return response
 
 
 @router.post(
