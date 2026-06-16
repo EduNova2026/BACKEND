@@ -9,7 +9,7 @@ variables:
   - secret: true
     name: token
   - name: promotion_id
-    value: 665186dc-300b-40f7-b04d-df204befaf93
+    value: 42dbd0ab-5502-4aab-9ee1-4c16d790898d
   - name: groupe_id
     value: 814b8886-a8aa-4ff9-8bd0-de84b7f49753
   - name: etudiant_id
@@ -23,7 +23,7 @@ variables:
   - name: responsable_id
     value: ""
   - name: enseignement_id
-    value: 1d9b681e-3956-4f2e-ac92-953d8ff95a97
+    value: 594018f1-1b54-4ec0-8750-1f92f185b9ef
   - name: examen_id
     value: ""
   - name: note_id

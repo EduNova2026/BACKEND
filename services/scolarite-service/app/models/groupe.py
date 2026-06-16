@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
-from sqlalchemy import ForeignKey, Index, String, UniqueConstraint
+from sqlalchemy import Float, ForeignKey, Index, Integer, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -21,6 +21,12 @@ class Groupe(Base):
         PgUUID(as_uuid=True), primary_key=True, default=uuid4
     )
     nom: Mapped[str] = mapped_column(String(100), nullable=False)
+    semestre: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1, server_default="1"
+    )
+    coefficient: Mapped[float] = mapped_column(
+        Float, nullable=False, default=1.0, server_default="1.0"
+    )
     promotion_id: Mapped[UUID] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("promotions.id"), nullable=False
     )
