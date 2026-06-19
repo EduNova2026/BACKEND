@@ -7,7 +7,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.refs import EtudiantRef
+from app.models.refs import EtudiantGroupeRef, EtudiantRef
 
 
 # Même logique de normalisation que scolarite-service (routers/etudiants.py::normalize_name)
@@ -28,10 +28,41 @@ async def find_etudiant_by_nom_prenom(
     prenom: str,
 ) -> UUID | None:
     result = await session.execute(
-        select(EtudiantRef).where(
+        select(EtudiantRef.id).where(
             EtudiantRef.nom == _normalize(nom),
             EtudiantRef.prenom == _normalize(prenom),
         )
     )
-    etudiant = result.scalar_one_or_none()
-    return etudiant.id if etudiant is not None else None
+    return result.scalars().first()
+
+
+async def find_etudiant_by_nom_prenom_in_groupe(
+    session: AsyncSession,
+    nom: str,
+    prenom: str,
+    groupe_id: UUID,
+) -> UUID | None:
+    result = await session.execute(
+        select(EtudiantRef.id)
+        .join(EtudiantGroupeRef, EtudiantGroupeRef.etudiant_id == EtudiantRef.id)
+        .where(
+            EtudiantRef.nom == _normalize(nom),
+            EtudiantRef.prenom == _normalize(prenom),
+            EtudiantGroupeRef.groupe_id == groupe_id,
+        )
+    )
+    return result.scalars().first()
+
+
+async def is_etudiant_in_groupe(
+    session: AsyncSession,
+    etudiant_id: UUID,
+    groupe_id: UUID,
+) -> bool:
+    result = await session.execute(
+        select(EtudiantGroupeRef).where(
+            EtudiantGroupeRef.etudiant_id == etudiant_id,
+            EtudiantGroupeRef.groupe_id == groupe_id,
+        )
+    )
+    return result.first() is not None

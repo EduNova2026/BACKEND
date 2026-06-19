@@ -28,3 +28,11 @@ class EnseignementRef(RefBase):
     groupe_id: Mapped[UUID] = mapped_column(PgUUID(as_uuid=True), nullable=False)
     matiere_id: Mapped[UUID] = mapped_column(PgUUID(as_uuid=True), nullable=False)
     annee_scolaire: Mapped[str] = mapped_column(String(9), nullable=False)
+
+
+class EtudiantGroupeRef(RefBase):
+    """Table etudiant_groupes — possédée par scolarite-service. READ-ONLY ici."""
+    __tablename__ = "etudiant_groupes"
+
+    etudiant_id: Mapped[UUID] = mapped_column(PgUUID(as_uuid=True), primary_key=True)
+    groupe_id: Mapped[UUID] = mapped_column(PgUUID(as_uuid=True), primary_key=True)

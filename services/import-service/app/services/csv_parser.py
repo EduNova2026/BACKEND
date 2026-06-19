@@ -2,7 +2,28 @@ from __future__ import annotations
 
 import csv
 import io
+import unicodedata
 from dataclasses import dataclass, field
+
+
+def _normalize_column_name(name: str) -> str:
+    """Strip accents from column name for tolerant matching."""
+    nfkd = unicodedata.normalize("NFKD", name)
+    return "".join(c for c in nfkd if not unicodedata.combining(c))
+
+
+def _get_row_column(row: dict[str, str], *candidates: str) -> str:
+    """Return the first matching column value, trying accent-stripped fallback."""
+    for col in candidates:
+        if col in row:
+            return row[col]
+    # Fallback: try accent-stripped matching
+    normalized_row = {_normalize_column_name(k): v for k, v in row.items()}
+    for col in candidates:
+        normalized = _normalize_column_name(col)
+        if normalized in normalized_row:
+            return normalized_row[normalized]
+    raise KeyError(candidates[0])
 
 
 @dataclass
@@ -61,19 +82,19 @@ def parse_aurion_csv(content: bytes) -> ResultatParsing:
         try:
             if examen is None:
                 examen = ExamenCSV(
-                    id_aurion=row["id.Épreuve"].strip(),
-                    code=row["Code.Épreuve"].strip(),
-                    libelle=row["Libellé.Épreuve"].strip(),
+                    id_aurion=_get_row_column(row, "id.Épreuve").strip(),
+                    code=_get_row_column(row, "Code.Épreuve").strip(),
+                    libelle=_get_row_column(row, "Libellé.Épreuve").strip(),
                 )
 
             absent = bool(row.get("id.Motif d absence", "").strip())
-            valeur = None if absent else _parse_note(row.get("Note numérique", ""))
+            valeur = None if absent else _parse_note(_get_row_column(row, "Note numérique"))
 
             lignes.append(LigneCSV(
                 ligne_num=i,
-                id_apprenant=row["id.Apprenant"].strip(),
-                prenom=row["Prénom.Apprenant"].strip(),
-                nom=row["Nom.Apprenant"].strip(),
+                id_apprenant=_get_row_column(row, "id.Apprenant").strip(),
+                prenom=_get_row_column(row, "Prénom.Apprenant").strip(),
+                nom=_get_row_column(row, "Nom.Apprenant").strip(),
                 valeur=valeur,
                 absent=absent,
                 motif_absence=row.get("Motif d absence", "").strip() or None,
