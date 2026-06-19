@@ -13,15 +13,21 @@ from shared.schemas import ErrorResponse
 from app.database import get_replica_session, get_session
 from app.dependencies.auth import (
     ADMIN_PEDAGOGIQUE,
+    RESPONSABLE_PEDAGOGIQUE,
     CurrentUser,
     ensure_can_access_etudiant,
     get_current_user,
     is_responsable_pedagogique,
+    require_groupe_access,
     require_responsable_pedagogique,
+    require_role,
 )
-from app.models import Etudiant, Groupe, ResponsablePromotion, etudiant_groupes
+from app.models import Etudiant, Examen, Groupe, Note, Promotion, ResponsablePromotion, etudiant_groupes
 from app.schemas import (
     EtudiantCreate,
+    EtudiantExportGroupeOut,
+    EtudiantExportNoteOut,
+    EtudiantExportOut,
     EtudiantGroupeOut,
     EtudiantOut,
     EtudiantSearchResponse,
@@ -311,7 +317,7 @@ async def list_etudiant_groupes(
 async def add_etudiant_to_groupe(
     etudiant_id: UUID,
     groupe_id: UUID,
-    _: CurrentUser = Depends(require_responsable_pedagogique),
+    _: CurrentUser = Depends(require_groupe_access),
     session: AsyncSession = Depends(get_session),
 ) -> EtudiantGroupeOut:
     etudiant = await session.get(Etudiant, etudiant_id)
@@ -378,3 +384,103 @@ async def remove_etudiant_from_groupe(
         )
 
     await session.commit()
+
+
+async def _etudiant_export_notes(
+    replica_session: AsyncSession,
+    etudiant_id: UUID,
+    groupe_id: UUID,
+) -> list[EtudiantExportNoteOut]:
+    rows = (
+        await replica_session.execute(
+            select(
+                Note.valeur,
+                Note.absent,
+                Note.motif_absence,
+                Examen.id,
+                Examen.nom,
+                Examen.type,
+                Examen.coefficient,
+                Examen.note_max,
+                Examen.date_examen,
+            )
+            .select_from(Note)
+            .join(Examen, Note.examen_id == Examen.id)
+            .where(
+                Note.etudiant_id == etudiant_id,
+                Examen.enseignement_id == groupe_id,
+            )
+            .order_by(Examen.date_examen, Examen.nom)
+        )
+    ).all()
+
+    return [
+        EtudiantExportNoteOut(
+            examen_id=row.id,
+            examen_nom=row.nom,
+            examen_type=row.type,
+            examen_coefficient=float(row.coefficient),
+            examen_note_max=float(row.note_max),
+            examen_date=row.date_examen,
+            note_valeur=float(row.valeur) if row.valeur is not None else None,
+            note_absent=row.absent,
+            note_motif_absence=row.motif_absence,
+        )
+        for row in rows
+    ]
+
+
+@router.get(
+    "/{etudiant_id}/export",
+    response_model=EtudiantExportOut,
+    responses={
+        status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
+        status.HTTP_403_FORBIDDEN: {"model": ErrorResponse},
+    },
+)
+async def export_etudiant(
+    etudiant_id: UUID,
+    _current_user: CurrentUser = Depends(
+        require_role(ADMIN_PEDAGOGIQUE, RESPONSABLE_PEDAGOGIQUE)
+    ),
+    replica_session: AsyncSession = Depends(get_replica_session),
+) -> EtudiantExportOut:
+    etudiant = await replica_session.scalar(
+        select(Etudiant)
+        .options(
+            selectinload(Etudiant.groupes),
+            selectinload(Etudiant.promotion),
+        )
+        .where(Etudiant.id == etudiant_id)
+    )
+    if etudiant is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Etudiant not found",
+        )
+
+    promotion_nom = etudiant.promotion.nom if etudiant.promotion else None
+
+    groupes_export: list[EtudiantExportGroupeOut] = []
+    for groupe in sorted(etudiant.groupes, key=lambda g: (g.semestre, g.nom)):
+        notes = await _etudiant_export_notes(
+            replica_session, etudiant_id, groupe.id
+        )
+        groupes_export.append(
+            EtudiantExportGroupeOut(
+                groupe_id=groupe.id,
+                groupe_nom=groupe.nom,
+                semestre=groupe.semestre,
+                coefficient=float(groupe.coefficient),
+                notes=notes,
+            )
+        )
+
+    return EtudiantExportOut(
+        etudiant_id=etudiant.id,
+        nom=etudiant.nom,
+        prenom=etudiant.prenom,
+        promotion_id=etudiant.promotion_id,
+        promotion_nom=promotion_nom,
+        groupes=groupes_export,
+    )

@@ -9,6 +9,7 @@ from app.services.http_client import proxy_request
 from shared.schemas import (
     ErrorResponse,
     EtudiantCreate,
+    EtudiantExportOut,
     EtudiantGroupeOut,
     EtudiantOut,
     EtudiantSearchResponse,
@@ -803,6 +804,22 @@ async def get_groupe_etudiants_moyennes(
     return await proxy_request(
         request,
         scolarite_url(f"groupes/{groupe_id}/etudiants/moyennes"),
+    )
+
+
+@router.get(
+    "/etudiants/{etudiant_id}/export",
+    response_model=EtudiantExportOut,
+    openapi_extra=AUTH_OPENAPI_EXTRA,
+    responses={
+        status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
+        status.HTTP_403_FORBIDDEN: {"model": ErrorResponse},
+    },
+)
+async def export_etudiant(request: Request, etudiant_id: UUID) -> Response:
+    return await proxy_request(
+        request,
+        scolarite_url(f"etudiants/{etudiant_id}/export"),
     )
 
 
