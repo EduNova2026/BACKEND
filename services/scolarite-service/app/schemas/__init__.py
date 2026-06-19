@@ -1,5 +1,8 @@
 from shared.schemas import (
     EtudiantCreate,
+    EtudiantExportGroupeOut,
+    EtudiantExportNoteOut,
+    EtudiantExportOut,
     EtudiantGroupeOut,
     EtudiantOut,
     EtudiantSearchResponse,
@@ -7,6 +10,7 @@ from shared.schemas import (
     EnseignantGroupeOut,
     ExamenCreate,
     ExamenOut,
+    ExamenUpdate,
     GroupeCreate,
     GroupeOut,
     GroupeUpdate,
@@ -29,6 +33,9 @@ from shared.schemas import (
 
 __all__ = [
     "EtudiantCreate",
+    "EtudiantExportGroupeOut",
+    "EtudiantExportNoteOut",
+    "EtudiantExportOut",
     "EtudiantGroupeOut",
     "EtudiantOut",
     "EtudiantSearchResponse",
@@ -36,6 +43,7 @@ __all__ = [
     "EnseignantGroupeOut",
     "ExamenCreate",
     "ExamenOut",
+    "ExamenUpdate",
     "GroupeCreate",
     "GroupeOut",
     "GroupeUpdate",
