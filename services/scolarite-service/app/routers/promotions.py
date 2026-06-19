@@ -17,6 +17,7 @@ from app.dependencies.auth import (
     ENSEIGNANT,
     get_current_user,
     is_responsable_pedagogique,
+    require_admin_pedagogique,
     require_responsable_pedagogique,
 )
 from app.models import EnseignantGroupe, Groupe, Promotion, ResponsablePromotion
@@ -105,7 +106,7 @@ async def list_promotions(
 )
 async def create_promotion(
     payload: PromotionCreate,
-    _: CurrentUser = Depends(require_responsable_pedagogique),
+    _: CurrentUser = Depends(require_admin_pedagogique),
     session: AsyncSession = Depends(get_session),
 ) -> PromotionOut:
     duplicate = await session.scalar(
@@ -155,7 +156,7 @@ async def get_promotion(
 async def update_promotion(
     promotion_id: UUID,
     payload: PromotionUpdate,
-    _: CurrentUser = Depends(require_responsable_pedagogique),
+    _: CurrentUser = Depends(require_admin_pedagogique),
     session: AsyncSession = Depends(get_session),
 ) -> PromotionOut:
     promotion = await session.get(Promotion, promotion_id)
@@ -197,7 +198,7 @@ async def update_promotion(
 )
 async def delete_promotion(
     promotion_id: UUID,
-    _: CurrentUser = Depends(require_responsable_pedagogique),
+    _: CurrentUser = Depends(require_admin_pedagogique),
     session: AsyncSession = Depends(get_session),
 ) -> None:
     promotion = await session.get(Promotion, promotion_id)
@@ -272,7 +273,7 @@ async def list_promotion_etudiants(
 async def enroll_etudiant_in_promotion(
     promotion_id: UUID,
     etudiant_id: UUID,
-    _: CurrentUser = Depends(require_responsable_pedagogique),
+    _: CurrentUser = Depends(require_admin_pedagogique),
     session: AsyncSession = Depends(get_session),
 ) -> EtudiantOut:
     etudiant = await get_etudiant_or_404(session, etudiant_id)
@@ -294,7 +295,7 @@ async def enroll_etudiant_in_promotion(
 async def unenroll_etudiant_from_promotion(
     promotion_id: UUID,
     etudiant_id: UUID,
-    _: CurrentUser = Depends(require_responsable_pedagogique),
+    _: CurrentUser = Depends(require_admin_pedagogique),
     session: AsyncSession = Depends(get_session),
 ) -> None:
     await get_promotion_or_404(session, promotion_id)

@@ -24,13 +24,13 @@ from app.external_models import external_metadata
 def build_auth_headers(
     user_id: str | None = None,
     roles: list[str] | None = None,
-    email: str = "rp@example.com",
+    email: str = "admin@example.com",
 ) -> dict[str, str]:
     token = jwt.encode(
         {
             "user_id": user_id or str(uuid4()),
             "email": email,
-            "roles": roles or ["responsable_pedagogique"],
+            "roles": roles or ["admin_pedagogique"],
             "token_type": "access",
             "iat": datetime.now(UTC),
             "exp": datetime.now(UTC) + timedelta(hours=1),
