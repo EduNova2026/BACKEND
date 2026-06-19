@@ -108,7 +108,7 @@ async def require_responsable_pedagogique(
 async def require_admin_pedagogique(
     current_user: CurrentUser = Depends(get_current_user),
 ) -> CurrentUser:
-    if not current_user.has_role(ADMIN_PEDAGOGIQUE):
+    if not any(current_user.has_role(role) for role in _ADMIN_OR_RP):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Insufficient permissions",
