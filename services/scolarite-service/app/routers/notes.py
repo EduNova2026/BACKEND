@@ -10,7 +10,13 @@ from sqlalchemy.orm import selectinload
 from shared.schemas import ErrorResponse
 
 from app.database import get_replica_session, get_session
-from app.dependencies.auth import CurrentUser, ensure_can_access_etudiant, get_current_user
+from app.dependencies.auth import (
+    CurrentUser,
+    can_access_etudiant,
+    ensure_can_access_etudiant,
+    get_current_user,
+    is_responsable_pedagogique,
+)
 from app.models import Examen, Note
 from app.schemas import ExamenCreate, ExamenOut, NoteBatchCreate, NoteCreate, NoteItemCreate, NoteOut, NoteUpdate
 
@@ -172,9 +178,12 @@ async def list_notes(
         query = query.where(Note.examen_id == examen_id)
 
     notes = (await replica_session.scalars(query.offset(skip).limit(limit))).all()
-    if etudiant_id is None:
+    if etudiant_id is None and not is_responsable_pedagogique(current_user):
+        accessible_notes: list[Note] = []
         for note in notes:
-            await ensure_can_access_etudiant(replica_session, current_user, note.etudiant_id)
+            if await can_access_etudiant(replica_session, current_user, note.etudiant_id):
+                accessible_notes.append(note)
+        notes = accessible_notes
     return [_note_out(note) for note in notes]
 
 

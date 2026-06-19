@@ -12,13 +12,14 @@ from shared.schemas import ErrorResponse
 
 from app.database import get_replica_session, get_session
 from app.dependencies.auth import (
+    ADMIN_PEDAGOGIQUE,
     CurrentUser,
     ensure_can_access_etudiant,
     get_current_user,
     is_responsable_pedagogique,
     require_responsable_pedagogique,
 )
-from app.models import Etudiant, Groupe, etudiant_groupes
+from app.models import Etudiant, Groupe, ResponsablePromotion, etudiant_groupes
 from app.schemas import (
     EtudiantCreate,
     EtudiantGroupeOut,
@@ -78,11 +79,22 @@ async def list_etudiants(
     prenom: str | None = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
-    _: CurrentUser = Depends(require_responsable_pedagogique),
+    current_user: CurrentUser = Depends(require_responsable_pedagogique),
     replica_session: AsyncSession = Depends(get_replica_session),
 ) -> list[EtudiantOut]:
+    query = etudiant_search_query(promotion_id, nom, prenom)
+
+    if not current_user.has_role(ADMIN_PEDAGOGIQUE):
+        query = query.where(
+            Etudiant.promotion_id.in_(
+                select(ResponsablePromotion.promotion_id).where(
+                    ResponsablePromotion.responsable_id == current_user.id
+                )
+            )
+        )
+
     result = await replica_session.scalars(
-        etudiant_search_query(promotion_id, nom, prenom).offset(skip).limit(limit)
+        query.offset(skip).limit(limit)
     )
     return result.all()
 
