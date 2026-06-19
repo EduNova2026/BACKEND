@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, status
@@ -9,10 +10,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_replica_session, get_session
 from app.dependencies.auth import get_current_user, require_role
 from app.models.import_job import ImportJob
+from app.models.refs import EnseignementRef
 from app.schemas.import_job import ImportJobOut
 from app.services.import_service import run_import
 
 router = APIRouter(prefix="/imports", tags=["imports"])
+
+_logger = logging.getLogger(__name__)
 
 _MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 Mo
 
@@ -28,6 +32,7 @@ async def upload_csv(
     file: UploadFile,
     enseignement_id: UUID | None = None,
     examen_id: UUID | None = None,
+    groupe_id: UUID | None = None,
     session: AsyncSession = Depends(get_session),
     replica_session: AsyncSession = Depends(get_replica_session),
     current_user: dict[str, object] = Depends(
@@ -54,16 +59,32 @@ async def upload_csv(
         )
 
     importe_par = UUID(str(current_user["id"]))
-    job = await run_import(
-        content=content,
-        nom_fichier=file.filename,
-        enseignement_id=enseignement_id,
-        examen_id=examen_id,
-        importe_par=importe_par,
-        authorization=request.headers.get("Authorization", ""),
-        session=session,
-        replica_session=replica_session,
-    )
+
+    # Use groupe_id from query param if provided, otherwise try to resolve from enseignement_id
+    resolved_groupe_id = groupe_id
+    if resolved_groupe_id is None and enseignement_id is not None:
+        enseignement = await replica_session.get(EnseignementRef, enseignement_id)
+        if enseignement is not None:
+            resolved_groupe_id = enseignement.groupe_id
+
+    try:
+        job = await run_import(
+            content=content,
+            nom_fichier=file.filename,
+            enseignement_id=enseignement_id,
+            examen_id=str(examen_id) if examen_id else None,
+            groupe_id=resolved_groupe_id,
+            importe_par=importe_par,
+            authorization=request.headers.get("Authorization", ""),
+            session=session,
+            replica_session=replica_session,
+        )
+    except Exception as exc:
+        _logger.exception("Import failed: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur lors de l'import : {exc}",
+        )
     return ImportJobOut.model_validate(job)
 
 

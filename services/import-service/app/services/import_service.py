@@ -10,7 +10,11 @@ from app.config import settings
 from app.models.import_job import ImportJob
 from app.models.refs import EnseignementRef
 from app.services.csv_parser import parse_aurion_csv
-from app.services.matcher import find_etudiant_by_nom_prenom
+from app.services.matcher import (
+    find_etudiant_by_nom_prenom,
+    find_etudiant_by_nom_prenom_in_groupe,
+    is_etudiant_in_groupe,
+)
 
 
 async def create_examen_in_scolarite(payload: dict[str, object], authorization: str) -> str:
@@ -45,6 +49,7 @@ async def run_import(
     nom_fichier: str,
     enseignement_id: UUID | None,
     examen_id: str | None,
+    groupe_id: UUID | None,
     importe_par: UUID,
     authorization: str,
     session: AsyncSession,
@@ -83,16 +88,38 @@ async def run_import(
     notes_payload: list[dict[str, object]] = []
 
     for ligne in resultat.lignes:
-        etudiant_id = await find_etudiant_by_nom_prenom(
-            replica_session, ligne.nom, ligne.prenom
-        )
+        etudiant_id = None
+        if groupe_id is not None:
+            etudiant_id = await find_etudiant_by_nom_prenom_in_groupe(
+                replica_session, ligne.nom, ligne.prenom, groupe_id
+            )
+        else:
+            etudiant_id = await find_etudiant_by_nom_prenom(
+                replica_session, ligne.nom, ligne.prenom
+            )
 
         if etudiant_id is None:
+            exists_in_base = await find_etudiant_by_nom_prenom(
+                replica_session, ligne.nom, ligne.prenom
+            )
             erreurs.append({
                 "ligne": ligne.ligne_num,
                 "nom": ligne.nom,
                 "prenom": ligne.prenom,
-                "raison": "Étudiant introuvable en base",
+                "raison": "Étudiant non inscrit dans ce groupe"
+                if groupe_id is not None and exists_in_base is not None
+                else "Étudiant introuvable en base",
+            })
+            continue
+
+        if groupe_id is not None and not await is_etudiant_in_groupe(
+            replica_session, etudiant_id, groupe_id
+        ):
+            erreurs.append({
+                "ligne": ligne.ligne_num,
+                "nom": ligne.nom,
+                "prenom": ligne.prenom,
+                "raison": "Étudiant non inscrit dans ce groupe",
             })
             continue
 
@@ -122,7 +149,7 @@ async def run_import(
     if notes_payload:
         try:
             if examen_id is None:
-                examen_id = await create_examen_in_scolarite(
+                exam_id = await create_examen_in_scolarite(
                     {
                         "enseignement_id": str(enseignement_id),
                         "nom": resultat.examen.libelle,
@@ -133,9 +160,11 @@ async def run_import(
                     },
                     authorization,
                 )
+            else:
+                exam_id = str(examen_id)
             await create_notes_in_scolarite(
                 {
-                    "examen_id": examen_id,
+                    "examen_id": exam_id,
                     "notes": notes_payload,
                 },
                 authorization,

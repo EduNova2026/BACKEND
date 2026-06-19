@@ -152,6 +152,17 @@ class ExamenCreate(BaseModel):
     code_aurion: str | None = None
 
 
+class ExamenUpdate(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+
+    nom: str | None = None
+    type: str | None = None
+    coefficient: float | None = Field(default=None, gt=0)
+    note_max: float | None = Field(default=None, gt=0)
+    date_examen: date | None = None
+    code_aurion: str | None = None
+
+
 class ExamenOut(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
 
@@ -237,3 +248,41 @@ class MoyenneParEtudiant(BaseModel):
     semestre: int
     note_count: int
     coefficient_total: float
+
+
+# --- Export étudiant ---
+
+
+class EtudiantExportNoteOut(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
+
+    examen_id: UUID
+    examen_nom: str
+    examen_type: str
+    examen_coefficient: float
+    examen_note_max: float
+    examen_date: date | None = None
+    note_valeur: float | None = None
+    note_absent: bool
+    note_motif_absence: str | None = None
+
+
+class EtudiantExportGroupeOut(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
+
+    groupe_id: UUID
+    groupe_nom: str
+    semestre: int
+    coefficient: float
+    notes: list[EtudiantExportNoteOut]
+
+
+class EtudiantExportOut(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
+
+    etudiant_id: UUID
+    nom: str
+    prenom: str
+    promotion_id: UUID | None = None
+    promotion_nom: str | None = None
+    groupes: list[EtudiantExportGroupeOut]

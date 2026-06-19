@@ -18,7 +18,7 @@ from app.dependencies.auth import (
     is_responsable_pedagogique,
 )
 from app.models import Examen, Note
-from app.schemas import ExamenCreate, ExamenOut, NoteBatchCreate, NoteCreate, NoteItemCreate, NoteOut, NoteUpdate
+from app.schemas import ExamenCreate, ExamenOut, ExamenUpdate, NoteBatchCreate, NoteCreate, NoteItemCreate, NoteOut, NoteUpdate
 
 router = APIRouter(tags=["notes"])
 
@@ -152,6 +152,27 @@ async def get_examen(
     replica_session: AsyncSession = Depends(get_replica_session),
 ) -> ExamenOut:
     examen = await _get_examen_or_404(replica_session, examen_id)
+    return _examen_out(examen)
+
+
+@router.patch(
+    "/examens/{examen_id}",
+    response_model=ExamenOut,
+    responses={status.HTTP_404_NOT_FOUND: {"model": ErrorResponse}},
+)
+async def update_examen(
+    examen_id: UUID,
+    payload: ExamenUpdate,
+    current_user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> ExamenOut:
+    _ = current_user
+    examen = await _get_examen_or_404(session, examen_id)
+    update_data = payload.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(examen, field, value)
+    await session.commit()
+    await session.refresh(examen)
     return _examen_out(examen)
 
 
