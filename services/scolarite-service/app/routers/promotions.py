@@ -12,13 +12,14 @@ from app.cache import cache_delete_pattern, cache_get_json, cache_set_json
 from app.config import settings
 from app.database import get_replica_session, get_session
 from app.dependencies.auth import (
+    ADMIN_PEDAGOGIQUE,
     CurrentUser,
     ENSEIGNANT,
     get_current_user,
     is_responsable_pedagogique,
     require_responsable_pedagogique,
 )
-from app.models import EnseignantGroupe, Groupe, Promotion
+from app.models import EnseignantGroupe, Groupe, Promotion, ResponsablePromotion
 from app.schemas import EtudiantOut, GroupeOut, PromotionCreate, PromotionOut, PromotionUpdate
 from app.services.promotion_membership import (
     ensure_promotion_reassignment_allowed,
@@ -39,7 +40,7 @@ async def list_promotions(
     current_user: CurrentUser = Depends(get_current_user),
     replica_session: AsyncSession = Depends(get_replica_session),
 ) -> list[PromotionOut]:
-    if is_responsable_pedagogique(current_user):
+    if current_user.has_role(ADMIN_PEDAGOGIQUE):
         cache_key = f"scolarite:promotions:list:{skip}:{limit}"
         cached = await cache_get_json(cache_key)
         if cached is not None:
@@ -47,6 +48,30 @@ async def list_promotions(
 
         result = await replica_session.scalars(
             select(Promotion).order_by(Promotion.nom).offset(skip).limit(limit)
+        )
+        promotions = result.all()
+        response = [PromotionOut.model_validate(promotion) for promotion in promotions]
+        await cache_set_json(cache_key, response, settings.cache_reference_ttl_seconds)
+        return response
+
+    if is_responsable_pedagogique(current_user):
+        cache_key = (
+            f"scolarite:promotions:list:rp:{current_user.id}:{skip}:{limit}"
+        )
+        cached = await cache_get_json(cache_key)
+        if cached is not None:
+            return [PromotionOut.model_validate(item) for item in cached]
+
+        result = await replica_session.scalars(
+            select(Promotion)
+            .join(
+                ResponsablePromotion,
+                ResponsablePromotion.promotion_id == Promotion.id,
+            )
+            .where(ResponsablePromotion.responsable_id == current_user.id)
+            .order_by(Promotion.nom)
+            .offset(skip)
+            .limit(limit)
         )
         promotions = result.all()
         response = [PromotionOut.model_validate(promotion) for promotion in promotions]
