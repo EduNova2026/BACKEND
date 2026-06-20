@@ -81,7 +81,14 @@ async def run_import(
         return job
 
     erreurs = list(
-        {"ligne": 1, "nom": "", "prenom": "", "raison": e}
+        {
+            "ligne": 1,
+            "nom": "",
+            "prenom": "",
+            "raison": e,
+            "code": "erreur_parsing",
+            "existe_en_base": False,
+        }
         for e in resultat.erreurs_parsing
     )
     ok = 0
@@ -102,14 +109,25 @@ async def run_import(
             exists_in_base = await find_etudiant_by_nom_prenom(
                 replica_session, ligne.nom, ligne.prenom
             )
-            erreurs.append({
-                "ligne": ligne.ligne_num,
-                "nom": ligne.nom,
-                "prenom": ligne.prenom,
-                "raison": "Étudiant non inscrit dans ce groupe"
-                if groupe_id is not None and exists_in_base is not None
-                else "Étudiant introuvable en base",
-            })
+            if groupe_id is not None and exists_in_base is not None:
+                erreurs.append({
+                    "ligne": ligne.ligne_num,
+                    "nom": ligne.nom,
+                    "prenom": ligne.prenom,
+                    "raison": "Étudiant présent dans EDU'NOVA mais non inscrit dans ce groupe",
+                    "code": "hors_groupe",
+                    "existe_en_base": True,
+                    "etudiant_id": str(exists_in_base),
+                })
+            else:
+                erreurs.append({
+                    "ligne": ligne.ligne_num,
+                    "nom": ligne.nom,
+                    "prenom": ligne.prenom,
+                    "raison": "Étudiant introuvable en base",
+                    "code": "etudiant_introuvable",
+                    "existe_en_base": False,
+                })
             continue
 
         if groupe_id is not None and not await is_etudiant_in_groupe(
@@ -119,7 +137,10 @@ async def run_import(
                 "ligne": ligne.ligne_num,
                 "nom": ligne.nom,
                 "prenom": ligne.prenom,
-                "raison": "Étudiant non inscrit dans ce groupe",
+                "raison": "Étudiant présent dans EDU'NOVA mais non inscrit dans ce groupe",
+                "code": "hors_groupe",
+                "existe_en_base": True,
+                "etudiant_id": str(etudiant_id),
             })
             continue
 
@@ -129,6 +150,9 @@ async def run_import(
                 "nom": ligne.nom,
                 "prenom": ligne.prenom,
                 "raison": "Note manquante et étudiant non marqué absent",
+                "code": "note_manquante",
+                "existe_en_base": True,
+                "etudiant_id": str(etudiant_id),
             })
             continue
 
