@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import ClassVar
+from typing import ClassVar, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -286,3 +286,33 @@ class EtudiantExportOut(BaseModel):
     promotion_id: UUID | None = None
     promotion_nom: str | None = None
     groupes: list[EtudiantExportGroupeOut]
+
+
+# --- Risque ---
+
+StatutRisque = Literal["Non évalué", "OK", "Suivre", "Risque"]
+ReferenceRisque = Literal["promotion", "groupe", "seuil_10"]
+
+
+class RisqueOut(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
+
+    score_risque: int | None = Field(default=None, ge=0, le=100)
+    statut: StatutRisque
+    moyenne: float | None = None
+    moyenne_reference: float | None = None
+    ecart_moyenne: float | None = None
+    semestre: int
+    note_count: int
+    coefficient_total: float
+    absence_count: int
+    evaluation_count: int
+    absence_rate: float
+    score_notes: int | None = Field(default=None, ge=0, le=100)
+    score_absences: int = Field(ge=0, le=100)
+    reference_scope: ReferenceRisque
+    formule_version: str = "risque-v1"
+
+
+class RisqueParEtudiant(RisqueOut):
+    etudiant_id: UUID
